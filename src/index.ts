@@ -9,7 +9,7 @@ import {
   type Signal,
   type Transition,
 } from "./monitor";
-import { sendAlert, validAlertUrl } from "./alerts";
+import { isPublicHost, sendAlert, validAlertUrl } from "./alerts";
 
 export interface Env {
   DB: D1Database;
@@ -19,7 +19,8 @@ export interface Env {
 
 const MAX_CHECKS_PER_PROJECT = 25;
 const PROJECTS_PER_IP_PER_DAY = 5;
-const PROBES_PER_SWEEP = 40; // stays under the free plan's 50 subrequests per invocation
+// Free plan allows 50 subrequests per invocation; probes, their alerts and D1 share the budget.
+const PROBES_PER_SWEEP = 25;
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 // ---------- small helpers ----------
@@ -164,7 +165,7 @@ async function checkWithProject(req: Request, env: Env, id: string): Promise<{ p
   return { project, check };
 }
 
-function validateCheckInput(b: Record<string, unknown>, existing?: Check): Record<string, unknown> {
+function validateCheckInput(b: Record<string, unknown>, ownHost: string, existing?: Check): Record<string, unknown> {
   const kind = existing?.kind ?? (b.kind === "http" ? "http" : "heartbeat");
   const out: Record<string, unknown> = { kind };
   if (b.name !== undefined || !existing) out.name = str(b.name, "name", 80);
@@ -193,6 +194,7 @@ function validateCheckInput(b: Record<string, unknown>, existing?: Check): Recor
         throw new HttpError(400, "url is not a valid URL");
       }
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new HttpError(400, "url must be http(s)");
+      if (!isPublicHost(parsed.hostname, ownHost)) throw new HttpError(400, "url must point to a public hostname");
       out.url = url;
     }
     if (b.interval_s !== undefined || !existing) out.interval_s = int(b.interval_s, "interval_s", 60, 86400, 300);
@@ -356,7 +358,7 @@ async function route(req: Request, env: Env): Promise<Response> {
       let alert = project.alert_url;
       if (b.alert_url !== undefined) {
         alert = str(b.alert_url, "alert_url", 500, false);
-        if (alert && !validAlertUrl(alert)) throw new HttpError(400, "alert_url must be an https URL");
+        if (alert && !validAlertUrl(alert, new URL(env.PUBLIC_URL).hostname)) throw new HttpError(400, "alert_url must be an https URL on a public host");
       }
       await env.DB.prepare("UPDATE projects SET name = ?, alert_url = ? WHERE id = ?").bind(name, alert, project.id).run();
       return json({ ok: true });
@@ -374,6 +376,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if ((r = m("/api/projects/([a-z0-9-]+)/alert-test")) && req.method === "POST") {
     const project = await auth(req, env, r[1]);
     if (!project.alert_url) throw new HttpError(400, "set an alert URL first");
+    await rateLimit(env, `alert-test:${project.id}`, 10, 3600_000);
     const ok = await sendAlert(project.alert_url, {
       project: project.name, check: "test", status: "test", at: Date.now(), statusPage: `${env.PUBLIC_URL}/s/${project.slug}`,
     });
@@ -384,7 +387,7 @@ async function route(req: Request, env: Env): Promise<Response> {
     const project = await auth(req, env, r[1]);
     const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM checks WHERE project_id = ?").bind(project.id).first<{ n: number }>();
     if ((count?.n ?? 0) >= MAX_CHECKS_PER_PROJECT) throw new HttpError(400, `limit of ${MAX_CHECKS_PER_PROJECT} checks per project`);
-    const v = validateCheckInput(await body(req));
+    const v = validateCheckInput(await body(req), new URL(env.PUBLIC_URL).hostname);
     const now = Date.now();
     const id = crypto.randomUUID();
     await env.DB.prepare(
@@ -406,7 +409,7 @@ async function route(req: Request, env: Env): Promise<Response> {
     const { check } = await checkWithProject(req, env, r[1]);
     if (req.method === "PATCH") {
       const b = await body(req);
-      const v = validateCheckInput(b, check);
+      const v = validateCheckInput(b, new URL(env.PUBLIC_URL).hostname, check);
       delete v.kind;
       const now = Date.now();
       let event: string | null = null;
@@ -454,14 +457,16 @@ async function route(req: Request, env: Env): Promise<Response> {
 async function probe(c: Check): Promise<{ ok: boolean; latency: number | null; detail?: string }> {
   const started = Date.now();
   try {
+    // Redirects are not followed: a redirect target is never re-validated, and each hop costs a subrequest.
+    // A 3xx still proves the site answers, so it counts as up when the expected status is 200.
     const res = await fetch(c.url!, {
-      redirect: "follow",
+      redirect: "manual",
       signal: AbortSignal.timeout(10_000),
       headers: { "user-agent": "Lastping/1.0 uptime probe (+https://github.com/youssef-110/lastping)" },
     });
     await res.body?.cancel();
     const latency = Date.now() - started;
-    const ok = c.expect_status === 200 ? res.ok : res.status === c.expect_status;
+    const ok = c.expect_status === 200 ? res.status >= 200 && res.status < 400 : res.status === c.expect_status;
     return { ok, latency, detail: ok ? undefined : `HTTP ${res.status}` };
   } catch (e) {
     const name = (e as Error).name;
@@ -474,18 +479,27 @@ export async function sweep(env: Env, now = Date.now()): Promise<{ heartbeats: n
   const { results: late } = await env.DB.prepare(
     "SELECT * FROM checks WHERE kind = 'heartbeat' AND status IN ('up','late') AND due_at <= ? LIMIT 500",
   ).bind(now).all<Row>();
+  // One bad check must never stall the sweep for everyone else.
   for (const c of late) {
-    const out = sweepHeartbeat(c, now);
-    if (out) await commit(env, c, out, now);
+    try {
+      const out = sweepHeartbeat(c, now);
+      if (out) await commit(env, c, out, now);
+    } catch (e) {
+      console.error("heartbeat sweep failed", c.id, e);
+    }
   }
 
   const { results: due } = await env.DB.prepare(
     "SELECT * FROM checks WHERE kind = 'http' AND status != 'paused' AND due_at <= ? ORDER BY due_at LIMIT ?",
   ).bind(now, PROBES_PER_SWEEP).all<Row>();
-  await Promise.all(
+  await Promise.allSettled(
     due.map(async (c) => {
-      const res = await probe(c);
-      await commit(env, c, applyProbe(c, res.ok, Date.now(), res.latency, res.detail), Date.now());
+      try {
+        const res = await probe(c);
+        await commit(env, c, applyProbe(c, res.ok, Date.now(), res.latency, res.detail), Date.now());
+      } catch (e) {
+        console.error("probe failed", c.id, e);
+      }
     }),
   );
 

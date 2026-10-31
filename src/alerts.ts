@@ -10,10 +10,23 @@ export interface AlertPayload {
   statusPage: string;
 }
 
-export function validAlertUrl(raw: string): boolean {
+/**
+ * Rejects IP literals, localhost-style names and our own host. Workers egress cannot reach private
+ * networks, but this still stops probes or alerts from looping back into Lastping or hitting raw IPs.
+ */
+export function isPublicHost(hostname: string, ownHost?: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, "");
+  if (!h.includes(".")) return false; // "localhost", single-label intranet names
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(":") || h.startsWith("[")) return false;
+  if (/\.(localhost|local|internal|lan|home\.arpa)$/.test(h)) return false;
+  if (ownHost && (h === ownHost || h.endsWith(`.${ownHost}`))) return false;
+  return true;
+}
+
+export function validAlertUrl(raw: string, ownHost?: string): boolean {
   try {
     const u = new URL(raw);
-    return u.protocol === "https:" && raw.length <= 500;
+    return u.protocol === "https:" && raw.length <= 500 && isPublicHost(u.hostname, ownHost);
   } catch {
     return false;
   }
@@ -26,10 +39,15 @@ export function formatAlert(url: string, p: AlertPayload): { body: string; heade
   const host = new URL(url).hostname;
 
   if (host === "discord.com" || host === "discordapp.com") {
-    return { body: JSON.stringify({ content: `${line}\n${p.statusPage}` }), headers: { "content-type": "application/json" } };
+    // Check names are user input: never let them trigger @everyone or role pings.
+    return {
+      body: JSON.stringify({ content: `${line}\n${p.statusPage}`, allowed_mentions: { parse: [] } }),
+      headers: { "content-type": "application/json" },
+    };
   }
   if (host === "hooks.slack.com") {
-    return { body: JSON.stringify({ text: `${line}\n${p.statusPage}` }), headers: { "content-type": "application/json" } };
+    const safe = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return { body: JSON.stringify({ text: `${safe}\n${p.statusPage}` }), headers: { "content-type": "application/json" } };
   }
   if (host === "ntfy.sh" || host.startsWith("ntfy.")) {
     return {
@@ -50,7 +68,7 @@ export async function sendAlert(url: string, p: AlertPayload): Promise<boolean> 
   if (!validAlertUrl(url)) return false;
   const { body, headers } = formatAlert(url, p);
   try {
-    const res = await fetch(url, { method: "POST", body, headers, signal: AbortSignal.timeout(5000) });
+    const res = await fetch(url, { method: "POST", body, headers, redirect: "manual", signal: AbortSignal.timeout(5000) });
     return res.ok;
   } catch {
     return false;

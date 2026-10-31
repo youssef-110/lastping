@@ -95,15 +95,27 @@ function route() {
   const m = path.match(/^\/p\/([a-z0-9-]+)$/);
   if (m) {
     const key = new URLSearchParams(query || "").get("key");
-    if (key) {
-      projects.put({ slug: m[1], name: projects.get(m[1])?.name || m[1], token: key });
-      history.replaceState(null, "", `#/p/${m[1]}`);
-    }
+    if (key) return importKey(m[1], key);
     return renderProject(m[1]);
   }
   renderHome();
 }
 window.addEventListener("hashchange", route);
+
+// A dashboard link carries a key. Check it works before storing it, and never silently replace a key we have.
+async function importKey(slug, key) {
+  history.replaceState(null, "", `#/p/${slug}`);
+  const existing = projects.get(slug);
+  if (existing?.token === key) return renderProject(slug);
+  try {
+    const r = await api(`/api/projects/${slug}`, { token: key });
+    if (existing && !confirm(`Replace the saved key for "${existing.name}" with the one from this link?`)) return renderProject(slug);
+    projects.put({ slug, name: r.project.name, token: key });
+  } catch {
+    toast("That dashboard link is invalid or expired");
+  }
+  renderProject(slug);
+}
 
 // ---------- home ----------
 

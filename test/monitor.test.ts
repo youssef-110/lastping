@@ -142,3 +142,23 @@ describe("uptimeByDay", () => {
     expect(b[1].downMs).toBe(12 * 3600_000);
   });
 });
+
+import { formatAlert, isPublicHost, validAlertUrl } from "../src/alerts";
+
+describe("outbound URL safety", () => {
+  it.each(["localhost", "127.0.0.1", "10.0.0.5", "[::1]", "printer.local", "db.internal", "intranet", "lastping.example.dev", "x.lastping.example.dev"])(
+    "rejects %s",
+    (host) => expect(isPublicHost(host, "lastping.example.dev")).toBe(false),
+  );
+  it("accepts normal public hosts", () => {
+    expect(isPublicHost("example.com", "lastping.example.dev")).toBe(true);
+    expect(validAlertUrl("https://ntfy.sh/topic")).toBe(true);
+    expect(validAlertUrl("http://ntfy.sh/topic")).toBe(false);
+  });
+  it("disables Discord mentions", () => {
+    const { body } = formatAlert("https://discord.com/api/webhooks/1/x", {
+      project: "p", check: "@everyone", status: "down", at: 0, statusPage: "https://x.test/s/p",
+    });
+    expect(JSON.parse(body).allowed_mentions).toEqual({ parse: [] });
+  });
+});
