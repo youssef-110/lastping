@@ -62,7 +62,8 @@ Cloudflare Workers free plan: 100k requests/day, 50 subrequests per invocation, 
 - Healthy HTTP probes write one row update and no event. Only failures and transitions are logged.
 - At most 40 probes run per sweep, below the 50-subrequest cap. Each has a 10 s timeout and runs in parallel.
 - Noisy events (pings, starts, probe failures) are trimmed after 30 days by an hourly housekeeping pass. Transitions stay forever.
-- Abuse limits: 5 projects per IP per day, 25 checks per project, size caps on every field, and https-only alert targets.
+- Abuse limits: 5 projects per IP per day, 25 checks per project, 10 test alerts per hour, and size caps on every field.
+- Outbound safety: probe and alert URLs must use public hostnames. IP literals, localhost-style and `.internal` names, and Lastping's own host are rejected. Redirects are not followed. Discord alerts disable mentions, so a check named `@everyone` pings nobody.
 
 ### Security model
 
