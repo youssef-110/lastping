@@ -1,0 +1,22 @@
+{
+  "name": "lastping",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Heartbeat, cron and uptime monitoring on the edge. Know when your stuff silently dies.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute lastping --remote --file=schema.sql",
+    "db:init:local": "wrangler d1 execute lastping --local --file=schema.sql",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.156.0"
+  }
+}

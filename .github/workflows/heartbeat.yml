@@ -1,0 +1,11 @@
+# Dogfooding: this repo reports to its own Lastping demo project every hour.
+# The ping URL can only mark that one check as alive, so it is fine to be public.
+name: heartbeat
+on:
+  schedule: [{ cron: "17 * * * *" }]
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS -m 10 --retry 3 https://lastping.a2a-cloud.workers.dev/ping/733ac9d1-06cc-4b95-abfd-ee5987146774

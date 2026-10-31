@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lastping",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/ping/*", "/s/*", "/badge/*"]
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lastping", "database_id": "0738a2ea-30b6-4fbb-89e8-c1aec1479311" }
+  ],
+  "vars": { "PUBLIC_URL": "https://lastping.a2a-cloud.workers.dev" },
+  "observability": { "enabled": true }
+}

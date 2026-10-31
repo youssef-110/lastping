@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lastping: know when your jobs stop running</title>
+  <meta name="description" content="Heartbeat, cron and uptime monitoring on the edge. Free, no signup, alerts to Discord, Slack or your phone.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="wrap">
+      <a class="brand" href="#/">
+        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="0.5" y="0.5" width="21" height="21" rx="5" fill="none" stroke="currentColor"/><path d="M4 12h3.5l2-5 3 9 2-4H18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Lastping
+      </a>
+      <nav>
+        <a href="#/">Projects</a>
+        <a href="https://github.com/youssef-110/lastping">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="app"></main>
+
+  <dialog id="checkDialog">
+    <form method="dialog" id="checkForm">
+      <h2 id="checkTitle">New check</h2>
+      <div class="seg" role="group" aria-label="Check type">
+        <button type="button" data-kind="heartbeat" aria-pressed="true">Heartbeat</button>
+        <button type="button" data-kind="http" aria-pressed="false">HTTP uptime</button>
+      </div>
+      <div class="field">
+        <label for="fName">Name</label>
+        <input id="fName" name="name" maxlength="80" required placeholder="nightly-backup">
+      </div>
+      <div data-for="heartbeat">
+        <div class="field">
+          <label>Schedule</label>
+          <div class="seg" role="group" aria-label="Schedule type" style="margin-bottom:10px">
+            <button type="button" data-sched="period" aria-pressed="true">Every…</button>
+            <button type="button" data-sched="cron" aria-pressed="false">Cron expression</button>
+          </div>
+          <div class="row" data-sched-panel="period">
+            <input id="fEvery" type="number" min="1" value="1" aria-label="Interval">
+            <select id="fUnit" aria-label="Unit">
+              <option value="60">minutes</option>
+              <option value="3600" selected>hours</option>
+              <option value="86400">days</option>
+            </select>
+          </div>
+          <div data-sched-panel="cron" hidden>
+            <input id="fCron" class="mono" placeholder="0 3 * * *" aria-label="Cron expression" autocomplete="off" spellcheck="false">
+            <div class="preview" id="cronPreview">Times are UTC.</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fGrace">Grace time (minutes)</label>
+          <input id="fGrace" type="number" min="1" value="5">
+          <div class="hint">How late a ping may be before the check goes down and you get alerted.</div>
+        </div>
+      </div>
+      <div data-for="http" hidden>
+        <div class="field">
+          <label for="fUrl">URL</label>
+          <input id="fUrl" type="url" class="mono" placeholder="https://example.com/health">
+        </div>
+        <div class="row field">
+          <div>
+            <label for="fInterval">Check every</label>
+            <select id="fInterval">
+              <option value="60">1 minute</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="900">15 minutes</option>
+              <option value="3600">1 hour</option>
+            </select>
+          </div>
+          <div>
+            <label for="fExpect">Expected status</label>
+            <input id="fExpect" type="number" min="100" max="599" value="200">
+          </div>
+        </div>
+        <div class="hint" style="margin:-6px 0 14px">200 accepts any 2xx. Two failures in a row mark it down.</div>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px">
+        <input id="fPublic" type="checkbox" checked style="width:auto;height:auto"> Show on public status page
+      </label>
+      <div class="error" id="checkError"></div>
+      <div class="foot">
+        <button type="button" value="cancel" data-close>Cancel</button>
+        <button type="submit" class="primary" id="checkSubmit">Create check</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <h2>Project settings</h2>
+      <div class="field">
+        <label for="sName">Name</label>
+        <input id="sName" maxlength="60" required>
+      </div>
+      <div class="field">
+        <label for="sAlert">Alert webhook</label>
+        <input id="sAlert" class="mono" placeholder="https://ntfy.sh/your-secret-topic">
+        <div class="hint">Discord or Slack webhook, an <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a> topic for phone push, or any https endpoint (gets JSON).</div>
+      </div>
+      <button type="button" id="testAlert">Send test alert</button>
+      <hr class="sep">
+      <div class="field">
+        <label>Dashboard link (contains your key, keep it private)</label>
+        <div class="copyline"><code id="sLink"></code><button type="button" class="ghost" data-copy-from="sLink">Copy</button></div>
+        <div class="hint">Open it on another device to manage this project there.</div>
+      </div>
+      <div class="error" id="settingsError"></div>
+      <div class="foot">
+        <button type="button" class="danger" id="deleteProject" style="margin-right:auto">Delete project</button>
+        <button type="button" data-close>Close</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

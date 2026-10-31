@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Status</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap" style="max-width:760px" id="sp">
+    <div class="sp-head"><div class="sub">Loading…</div></div>
+  </main>
+  <script>
+    const slug = location.pathname.split("/").pop();
+    const root = document.getElementById("sp");
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const pct = (x) => x === null ? "no data" : (x * 100).toFixed(x >= 0.9995 ? 2 : 2) + "% uptime";
+    const ago = (ms) => { if (!ms) return "never"; const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 2160 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
+    const LABEL = { up: "Operational", late: "Late", down: "Down", new: "Waiting for data", paused: "Paused" };
+
+    async function load() {
+      const res = await fetch("/api/status/" + slug);
+      if (!res.ok) { root.replaceChildren(el("div", "sp-head", "")); root.firstChild.append(el("h1", "", "Status page not found")); return; }
+      const d = await res.json();
+      document.title = d.name + " status";
+      const active = d.checks.filter((c) => c.status !== "paused" && c.status !== "new");
+      const worst = active.some((c) => c.status === "down") ? "down" : active.some((c) => c.status === "late") ? "late" : "up";
+      const head = el("div", "sp-head");
+      head.append(el("h1", "", d.name));
+      const banner = el("div", "banner " + worst);
+      banner.append(el("span", "dot " + (active.length ? worst : "")),
+        el("span", "", !active.length ? "Collecting data" : worst === "down" ? "Some systems are down" : worst === "late" ? "Some systems are degraded" : "All systems operational"));
+      head.append(banner);
+
+      const list = el("div", "sp-list");
+      for (const c of d.checks) {
+        const row = el("div", "sp-check");
+        const top = el("div", "top");
+        top.append(el("span", "dot " + c.status), el("span", "name", c.name), el("span", "state " + c.status, LABEL[c.status] || c.status));
+        top.lastChild.style.fontSize = "12px";
+        top.append(el("span", "pct", pct(c.uptime_90d)));
+        const bars = el("div", "bars");
+        const start = Date.parse(d.from_day + "T00:00:00Z");
+        c.days.forEach((u, i) => {
+          const b = el("i", u === null ? "none" : u >= 0.999 ? "" : u >= 0.95 ? "minor" : "major");
+          const day = new Date(start + i * 86400000).toISOString().slice(0, 10);
+          b.title = day + ": " + (u === null ? "no data" : (u * 100).toFixed(2) + "%");
+          bars.append(b);
+        });
+        const legend = el("div", "bars-legend");
+        legend.append(el("span", "", "90 days ago"),
+          el("span", "", c.status === "down" && c.down_since ? "down since " + new Date(c.down_since).toLocaleString() : (c.kind === "http" ? "checked " : "last ping ") + ago(c.last_ping_at)),
+          el("span", "", "today"));
+        row.append(top, bars, legend);
+        list.append(row);
+      }
+      if (!d.checks.length) list.append(el("div", "empty", "No public checks yet."));
+      const foot = el("footer", "");
+      foot.append("Updated " + new Date(d.generated_at).toLocaleTimeString() + " · Monitored with ");
+      const a = el("a", "", "Lastping"); a.href = "/"; foot.append(a);
+      root.replaceChildren(head, list, foot);
+    }
+    load();
+    setInterval(load, 60000);
+  </script>
+</body>
+</html>
