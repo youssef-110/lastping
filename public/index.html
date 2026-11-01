@@ -3,129 +3,302 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lastping: know when your jobs stop running</title>
-  <meta name="description" content="Heartbeat, cron and uptime monitoring on the edge. Free, no signup, alerts to Discord, Slack or your phone.">
+  <title>Lastping — Know the moment your jobs stop running</title>
+  <meta name="description" content="Cron job, heartbeat and uptime monitoring. One line of curl, alerts on Discord, Slack or your phone, public status pages. Free.">
+  <meta name="theme-color" content="#f4f2f0">
+  <meta property="og:title" content="Lastping — Know the moment your jobs stop running">
+  <meta property="og:description" content="Cron, heartbeat and uptime monitoring with one line of curl. Free.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/landing.css">
+  <script>
+    // Old dashboard links (/#/p/slug?key=…) now live under /app.
+    if (location.hash.startsWith("#/p/")) location.replace("/app" + location.hash);
+  </script>
 </head>
 <body>
-  <header class="bar">
-    <div class="wrap">
-      <a class="brand" href="#/">
-        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="0.5" y="0.5" width="21" height="21" rx="5" fill="none" stroke="currentColor"/><path d="M4 12h3.5l2-5 3 9 2-4H18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Lastping
+  <div class="announce">
+    <div class="container">
+      <span class="announce-tag">New</span>
+      Sign in with a passkey<span class="long">: no passwords, no email, synced across your devices</span>.
+      <a href="/app#/signin">Try it</a>
+    </div>
+  </div>
+
+  <header class="nav" id="nav">
+    <div class="container nav-row">
+      <a class="logo" href="/" aria-label="Lastping home">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0c0a08"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg>
+        <span>lastping</span>
       </a>
-      <nav>
-        <a href="#/">Projects</a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#product">Product</a>
+        <a href="#how">How it works</a>
+        <a href="#docs">Integrations</a>
+        <a href="#pricing">Pricing</a>
         <a href="https://github.com/youssef-110/lastping">GitHub</a>
       </nav>
+      <div class="nav-cta">
+        <a class="btn btn-ghost" href="/app#/signin" id="navSignin">Sign in</a>
+        <a class="btn btn-primary" href="/app#/new">Start free</a>
+      </div>
     </div>
   </header>
 
-  <main class="wrap" id="app"></main>
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-copy">
+          <p class="eyebrow">Cron · heartbeat · uptime monitoring</p>
+          <h1>Know the moment your jobs stop running.</h1>
+          <p class="hero-sub">Backups, cron jobs and workers fail silently. Lastping expects a ping on schedule and alerts you the minute one goes missing, so you never find out from a customer.</p>
+          <form class="composite" id="heroForm">
+            <input class="input" id="heroName" placeholder="Name your first project" maxlength="60" aria-label="Project name" required>
+            <button class="btn btn-primary btn-lg" type="submit">Start monitoring</button>
+          </form>
+          <p class="hero-note" id="heroNote">Free · no credit card · set up in under a minute</p>
+        </div>
 
-  <dialog id="checkDialog">
-    <form method="dialog" id="checkForm">
-      <h2 id="checkTitle">New check</h2>
-      <div class="seg" role="group" aria-label="Check type">
-        <button type="button" data-kind="heartbeat" aria-pressed="true">Heartbeat</button>
-        <button type="button" data-kind="http" aria-pressed="false">HTTP uptime</button>
-      </div>
-      <div class="field">
-        <label for="fName">Name</label>
-        <input id="fName" name="name" maxlength="80" required placeholder="nightly-backup">
-      </div>
-      <div data-for="heartbeat">
-        <div class="field">
-          <label>Schedule</label>
-          <div class="seg" role="group" aria-label="Schedule type" style="margin-bottom:10px">
-            <button type="button" data-sched="period" aria-pressed="true">Every…</button>
-            <button type="button" data-sched="cron" aria-pressed="false">Cron expression</button>
+        <div class="frame" aria-label="Lastping dashboard preview">
+          <div class="frame-bar">
+            <span></span><span></span><span></span>
+            <div class="frame-url">lastping.app/acme-production</div>
           </div>
-          <div class="row" data-sched-panel="period">
-            <input id="fEvery" type="number" min="1" value="1" aria-label="Interval">
-            <select id="fUnit" aria-label="Unit">
-              <option value="60">minutes</option>
-              <option value="3600" selected>hours</option>
-              <option value="86400">days</option>
-            </select>
-          </div>
-          <div data-sched-panel="cron" hidden>
-            <input id="fCron" class="mono" placeholder="0 3 * * *" aria-label="Cron expression" autocomplete="off" spellcheck="false">
-            <div class="preview" id="cronPreview">Times are UTC.</div>
+          <div class="mock" id="mock">
+            <div class="mock-head">
+              <div>
+                <div class="eyebrow">Project</div>
+                <div class="mock-title">acme-production</div>
+              </div>
+              <div class="mock-stats">
+                <div><span class="num" id="mUp">5</span><small>up</small></div>
+                <div><span class="num" id="mDown">0</span><small>down</small></div>
+                <div><span class="num">99.98%</span><small>30-day uptime</small></div>
+              </div>
+            </div>
+            <div class="mock-table" id="mockRows"></div>
+            <div class="mock-toast" id="mockToast" role="presentation">
+              <div class="mt-icon"></div>
+              <div><b id="mtTitle">billing-worker is DOWN</b><span id="mtBody">No ping for 15 min · sent to #ops on Discord</span></div>
+            </div>
           </div>
         </div>
-        <div class="field">
-          <label for="fGrace">Grace time (minutes)</label>
-          <input id="fGrace" type="number" min="1" value="5">
-          <div class="hint">How late a ping may be before the check goes down and you get alerted.</div>
-        </div>
       </div>
-      <div data-for="http" hidden>
-        <div class="field">
-          <label for="fUrl">URL</label>
-          <input id="fUrl" type="url" class="mono" placeholder="https://example.com/health">
-        </div>
-        <div class="row field">
-          <div>
-            <label for="fInterval">Check every</label>
-            <select id="fInterval">
-              <option value="60">1 minute</option>
-              <option value="300" selected>5 minutes</option>
-              <option value="900">15 minutes</option>
-              <option value="3600">1 hour</option>
-            </select>
-          </div>
-          <div>
-            <label for="fExpect">Expected status</label>
-            <input id="fExpect" type="number" min="100" max="599" value="200">
-          </div>
-        </div>
-        <div class="hint" style="margin:-6px 0 14px">200 accepts any 2xx. Two failures in a row mark it down.</div>
-      </div>
-      <label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px">
-        <input id="fPublic" type="checkbox" checked style="width:auto;height:auto"> Show on public status page
-      </label>
-      <div class="error" id="checkError"></div>
-      <div class="foot">
-        <button type="button" value="cancel" data-close>Cancel</button>
-        <button type="submit" class="primary" id="checkSubmit">Create check</button>
-      </div>
-    </form>
-  </dialog>
+    </section>
 
-  <dialog id="settingsDialog">
-    <form method="dialog" id="settingsForm">
-      <h2>Project settings</h2>
-      <div class="field">
-        <label for="sName">Name</label>
-        <input id="sName" maxlength="60" required>
+    <section class="works">
+      <div class="container">
+        <p class="eyebrow">Works with anything that can make an HTTP request</p>
+        <div class="works-grid">
+          <div>crontab</div><div>systemd timers</div><div>GitHub Actions</div><div>Kubernetes CronJob</div>
+          <div>Docker</div><div>Python</div><div>Node.js</div><div>Bash</div><div>Vercel Cron</div><div>Windows Task Scheduler</div>
+          <div class="works-dark"><span class="mono">curl -fsS …/ping/&lt;id&gt;</span><small>is the whole integration</small></div>
+        </div>
       </div>
-      <div class="field">
-        <label for="sAlert">Alert webhook</label>
-        <input id="sAlert" class="mono" placeholder="https://ntfy.sh/your-secret-topic">
-        <div class="hint">Discord or Slack webhook, an <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy.sh</a> topic for phone push, or any https endpoint (gets JSON).</div>
-      </div>
-      <button type="button" id="testAlert">Send test alert</button>
-      <hr class="sep">
-      <div class="field">
-        <label>Dashboard link (contains your key, keep it private)</label>
-        <div class="copyline"><code id="sLink"></code><button type="button" class="ghost" data-copy-from="sLink">Copy</button></div>
-        <div class="hint">Open it on another device to manage this project there.</div>
-      </div>
-      <div class="error" id="settingsError"></div>
-      <div class="foot">
-        <button type="button" class="danger" id="deleteProject" style="margin-right:auto">Delete project</button>
-        <button type="button" data-close>Close</button>
-        <button type="submit" class="primary">Save</button>
-      </div>
-    </form>
-  </dialog>
+    </section>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js" type="module"></script>
+    <section class="ticker" aria-label="Live numbers">
+      <div class="container ticker-row">
+        <div><span class="eyebrow">Live</span><b class="live-dot"></b></div>
+        <div><span class="eyebrow">Checks monitored</span><b class="num" data-stat="checks">—</b></div>
+        <div><span class="eyebrow">Up right now</span><b class="num" data-stat="up">—</b></div>
+        <div><span class="eyebrow">Signals, last 24h</span><b class="num" data-stat="signals_24h">—</b></div>
+        <div><span class="eyebrow">Sweep interval</span><b class="num">60 s</b></div>
+      </div>
+    </section>
+
+    <section class="features" id="product">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Product</p>
+          <h2>Everything you need to stop silent failures.</h2>
+        </div>
+
+        <div class="feature">
+          <div class="feature-copy">
+            <h3>Heartbeats for anything on a schedule</h3>
+            <p>Give each job a ping URL. Use a simple interval or a real cron expression, plus a grace window. If the ping is late, the check goes late, then down, and you hear about it once, not fifty times.</p>
+            <ul class="ticks">
+              <li>Cron expressions with a live preview of the next runs</li>
+              <li>Report exit codes: <code>/ping/&lt;id&gt;/$?</code></li>
+              <li>Measure run time with <code>/start</code>, attach logs on <code>/fail</code></li>
+            </ul>
+          </div>
+          <div class="feature-visual card code-card">
+            <div class="code-head"><span class="eyebrow">crontab</span><span class="chip up">receiving</span></div>
+<pre><span class="c"># back up nightly, then report the exit code</span>
+0 3 * * *  ./backup.sh; \
+  curl -fsS -m 10 lastping.app/ping/8f2c…/<span class="hl">$?</span>
+
+<span class="c"># → 03:00:41  ping  ran 38.2 s</span>
+<span class="c"># → next run  tomorrow 03:00 UTC</span></pre>
+          </div>
+        </div>
+
+        <div class="feature reverse">
+          <div class="feature-copy">
+            <h3>Uptime checks without the noise</h3>
+            <p>Probe any website or API from Cloudflare's network every minute. A check only goes down after two failures in a row, so a single blip never wakes you up.</p>
+            <ul class="ticks">
+              <li>Expected status codes and response times</li>
+              <li>Flap damping built in</li>
+              <li>Recovery alerts when it comes back</li>
+            </ul>
+          </div>
+          <div class="feature-visual card probe-card">
+            <div class="probe"><span class="mono">12:04</span><span class="chip">200</span><span class="mono ash">84 ms</span></div>
+            <div class="probe"><span class="mono">12:05</span><span class="chip">200</span><span class="mono ash">91 ms</span></div>
+            <div class="probe"><span class="mono">12:06</span><span class="chip late">503</span><span class="mono ash">1 failure, waiting</span></div>
+            <div class="probe"><span class="mono">12:07</span><span class="chip down">503</span><span class="mono">marked down, alert sent</span></div>
+            <div class="probe"><span class="mono">12:11</span><span class="chip up">200</span><span class="mono">recovered after 4 min</span></div>
+          </div>
+        </div>
+
+        <div class="feature">
+          <div class="feature-copy">
+            <h3>Alerts where you already are</h3>
+            <p>Paste a Discord or Slack webhook, an ntfy topic for push notifications on your phone, or any HTTPS endpoint. Send a test with one click.</p>
+            <div class="channels"><span>Discord</span><span>Slack</span><span>ntfy push</span><span>Webhook</span></div>
+          </div>
+          <div class="feature-visual card alert-card">
+            <div class="alert-msg">
+              <div class="am-avatar"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0c0a08"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg></div>
+              <div><b>Lastping</b> <span class="ash">today at 03:16</span><p>🔴 acme / nightly-backup is DOWN (exit code 1: disk full)</p></div>
+            </div>
+            <div class="alert-msg">
+              <div class="am-avatar"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0c0a08"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg></div>
+              <div><b>Lastping</b> <span class="ash">today at 03:41</span><p>🟢 acme / nightly-backup is back UP</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature reverse">
+          <div class="feature-copy">
+            <h3>Status pages and badges, included</h3>
+            <p>Every project gets a public status page with 90 days of history and a README badge. Pick exactly which checks are public.</p>
+            <a class="btn btn-outline" href="/s/lastping-demo">See a live status page</a>
+          </div>
+          <div class="feature-visual card status-card">
+            <div class="sc-banner"><span class="dot up"></span>All systems operational</div>
+            <div class="sc-row"><span>API</span><span class="ash num">99.99%</span></div>
+            <div class="bars" data-fake-bars="60" data-bad="41"></div>
+            <div class="sc-row"><span>Dashboard</span><span class="ash num">100%</span></div>
+            <div class="bars" data-fake-bars="60"></div>
+            <img class="badge" src="/badge/lastping-demo.svg" alt="status badge" width="132" height="20" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="how" id="how">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2>Three steps. About sixty seconds.</h2>
+        </div>
+        <div class="steps">
+          <div class="step card"><span class="step-n">01</span><h3>Create a check</h3><p>Name it and set the schedule your job runs on, or paste a URL to watch.</p></div>
+          <div class="step card"><span class="step-n">02</span><h3>Add one line</h3><p>Append a <code>curl</code> to your job. No agent, no SDK, no config files.</p></div>
+          <div class="step card"><span class="step-n">03</span><h3>Get alerted</h3><p>Missed ping or failed probe: one alert, then one more when it recovers.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="docs" id="docs">
+      <div class="container docs-grid">
+        <div>
+          <p class="eyebrow">Integrations</p>
+          <h2>One line, wherever your jobs run.</h2>
+          <p class="docs-sub">If it can make an HTTP request, it can report to Lastping. Pick your runtime and copy the snippet.</p>
+        </div>
+        <div class="card snippet">
+          <div class="tabs" role="tablist" id="docTabs"></div>
+          <pre id="docCode"></pre>
+          <button class="btn btn-quiet btn-sm copy-btn" id="docCopy" type="button">Copy</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="pricing" id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Pricing</p>
+          <h2>Free while we build. Fair when we're done.</h2>
+        </div>
+        <div class="plans">
+          <div class="plan card featured">
+            <div class="plan-top"><h3>Free</h3><span class="chip up">Available now</span></div>
+            <div class="price"><span class="num">$0</span><small>forever for side projects</small></div>
+            <ul class="ticks">
+              <li>25 checks per project</li>
+              <li>Heartbeats, cron schedules and HTTP checks</li>
+              <li>Discord, Slack, ntfy and webhook alerts</li>
+              <li>Public status page and badge</li>
+              <li>Passkey accounts, unlimited projects</li>
+            </ul>
+            <a class="btn btn-primary btn-lg" href="/app#/new">Start free</a>
+          </div>
+          <div class="plan card">
+            <div class="plan-top"><h3>Pro</h3><span class="chip">Planned</span></div>
+            <div class="price"><span class="num">$9</span><small>per month</small></div>
+            <ul class="ticks">
+              <li>Unlimited checks</li>
+              <li>SMS and phone call alerts</li>
+              <li>Teams and shared projects</li>
+              <li>Multi-region probes</li>
+              <li>1-year history and custom status domains</li>
+            </ul>
+            <a class="btn btn-outline btn-lg" href="https://github.com/youssef-110/lastping">Follow on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq">
+      <div class="container faq-grid">
+        <div>
+          <p class="eyebrow">FAQ</p>
+          <h2>Questions, answered.</h2>
+        </div>
+        <div class="faq-list">
+          <details><summary>What's the difference between a heartbeat and an uptime check?</summary><p>A heartbeat waits for <em>your job</em> to call Lastping. Use it for cron jobs, backups and workers. An uptime check makes Lastping call <em>your site</em> every minute. Use it for websites and APIs.</p></details>
+          <details><summary>Do I need an account?</summary><p>No. You can create a project instantly and manage it with a private dashboard link. Sign in with a passkey when you want your projects on every device.</p></details>
+          <details><summary>What is a passkey?</summary><p>A passkey replaces a password with your device's fingerprint, face or PIN. Nothing to remember, nothing to leak, and it syncs through iCloud Keychain, Google Password Manager or Windows.</p></details>
+          <details><summary>How fast will I be alerted?</summary><p>Lastping sweeps every minute. A heartbeat alerts as soon as its grace time runs out; a failed exit code alerts immediately. Uptime checks alert after two failed probes in a row.</p></details>
+          <details><summary>Is it open source?</summary><p>Yes, MIT licensed. It runs on Cloudflare Workers and D1, and you can self-host it on the free tier in a few minutes.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="container final-row">
+        <h2>Your next silent failure is already scheduled.</h2>
+        <a class="btn btn-primary btn-lg" href="/app#/new">Start monitoring, free</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-row">
+      <div>
+        <a class="logo logo-inv" href="/">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2c2b29"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg>
+          <span>lastping</span>
+        </a>
+        <p class="footer-note">Cron, heartbeat and uptime monitoring.<br>Open source under the MIT license.</p>
+      </div>
+      <div class="footer-cols">
+        <div><span class="eyebrow">Product</span><a href="#product">Features</a><a href="#pricing">Pricing</a><a href="/s/lastping-demo">Live status page</a></div>
+        <div><span class="eyebrow">Developers</span><a href="#docs">Integrations</a><a href="https://github.com/youssef-110/lastping">GitHub</a><a href="https://github.com/youssef-110/lastping#readme">Docs</a></div>
+        <div><span class="eyebrow">Account</span><a href="/app#/signin">Sign in</a><a href="/app#/new">Create project</a></div>
+      </div>
+    </div>
+    <div class="container footer-base">© 2026 Lastping</div>
+  </footer>
+
+  <script src="/js/landing.js" type="module"></script>
 </body>
 </html>

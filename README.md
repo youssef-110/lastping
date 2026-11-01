@@ -5,7 +5,7 @@
 [![status](https://lastping.a2a-cloud.workers.dev/badge/lastping-demo.svg)](https://lastping.a2a-cloud.workers.dev/s/lastping-demo)
 [![ci](https://github.com/youssef-110/lastping/actions/workflows/ci.yml/badge.svg)](https://github.com/youssef-110/lastping/actions/workflows/ci.yml)
 
-- **Live app:** https://lastping.a2a-cloud.workers.dev
+- **Live app:** https://lastping.a2a-cloud.workers.dev (dashboard at `/app`, passkey sign-in)
 - **Live status page** (my own deployed projects, monitored by Lastping): https://lastping.a2a-cloud.workers.dev/s/lastping-demo
 
 Cron jobs, backups, scrapers and queue workers fail silently: nothing errors, they just stop. Lastping turns that silence into an alert. A job pings a URL when it finishes. If the ping doesn't arrive on schedule, the check goes **late**, then **down**, and you get a Discord, Slack, ntfy (phone push) or webhook alert. It also probes websites over HTTP every minute, and publishes a status page and README badge for each project.
@@ -65,9 +65,19 @@ Cloudflare Workers free plan: 100k requests/day, 50 subrequests per invocation, 
 - Abuse limits: 5 projects per IP per day, 25 checks per project, 10 test alerts per hour, and size caps on every field.
 - Outbound safety: probe and alert URLs must use public hostnames. IP literals, localhost-style and `.internal` names, and Lastping's own host are rejected. Redirects are not followed. Discord alerts disable mentions, so a check named `@everyone` pings nobody.
 
+### Accounts: passkeys, no passwords
+
+Signing in is optional, and it uses **passkeys (WebAuthn)**: Touch ID, Face ID, Windows Hello, an Android device or a security key. There are no passwords and no email addresses, so the only personal data stored is the display name you choose.
+
+- Registration and login are verified server-side with `@simplewebauthn/server`. Lastping stores only each credential's public key and signature counter.
+- Challenges are single-use: the row is deleted as it is read, and it expires after 5 minutes.
+- Sessions use an `HttpOnly; Secure; SameSite=Lax` cookie holding a random 256-bit token. Only its hash is stored, and it expires after 30 days.
+- Cookie-authenticated writes must send an `x-lastping` header, a CSRF guard that a cross-site form can't satisfy.
+- Projects made before signing in are moved into your account automatically, using the keys already in your browser.
+
 ### Security model
 
-There are no accounts and no personal data. Creating a project returns a random 192-bit key. Only its SHA-256 hash is stored, and the dashboard keeps the key in `localStorage`. You can move it to another device with a link that carries the key in the URL fragment, which browsers never send to the server. Check IDs are random UUIDs, and knowing one only lets you report pings for that check. Status pages show only checks marked public, and never their IDs.
+You can still use Lastping with no account at all. Creating a project returns a random 192-bit key. Only its SHA-256 hash is stored, and the dashboard keeps the key in `localStorage`. You can move it to another device with a link that carries the key in the URL fragment, which browsers never send to the server. Check IDs are random UUIDs, and knowing one only lets you report pings for that check. Status pages show only checks marked public, and never their IDs.
 
 ## Tests
 

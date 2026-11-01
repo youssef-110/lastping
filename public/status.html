@@ -4,66 +4,108 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Status</title>
+  <meta name="theme-color" content="#f4f2f0">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <style>
+    .sp { max-width: 820px; margin: 0 auto; padding: 56px 24px 64px; }
+    .sp-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 40px; }
+    .sp h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.02; letter-spacing: -0.04em; }
+    .sp-banner { display: flex; align-items: center; gap: 14px; padding: 20px 22px; border-radius: var(--r-card); font-size: 18px; letter-spacing: -0.01em; margin: 28px 0 20px; }
+    .sp-banner.up { background: var(--obsidian); color: var(--paper); }
+    .sp-banner.down { background: var(--down-wash); color: #8f1d22; }
+    .sp-banner.late { background: var(--late-wash); color: #6e4700; }
+    .sp-banner.none { background: var(--wash); }
+    .sp-banner small { margin-left: auto; font-size: 13px; opacity: 0.7; }
+    .sp-list { overflow: hidden; }
+    .sp-check { padding: 22px 24px; border-bottom: 1px solid var(--hairline); }
+    .sp-check:last-child { border-bottom: 0; }
+    .sp-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .sp-row .name { font-weight: 500; font-size: 16px; }
+    .sp-row .pct { margin-left: auto; color: var(--ash); font-size: 13.5px; }
+    .sp .bars { height: 34px; }
+    .sp .bars i { cursor: default; }
+    .sp-legend { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); margin-top: 8px; gap: 12px; }
+    .sp-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; font-size: 13px; color: var(--ash); gap: 16px; flex-wrap: wrap; }
+    .sp-foot a { color: var(--ash); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+    .sp-foot a:hover { color: var(--ink); }
+    .sp-foot svg { width: 18px; height: 18px; }
+    .tip { position: fixed; pointer-events: none; background: var(--obsidian); color: var(--paper); font-size: 12px; padding: 6px 9px; border-radius: 6px; opacity: 0; transition: opacity 120ms var(--ease); z-index: 10; white-space: nowrap; }
+    .tip.show { opacity: 1; }
+  </style>
 </head>
 <body>
-  <main class="wrap" style="max-width:760px" id="sp">
-    <div class="sp-head"><div class="sub">Loading…</div></div>
-  </main>
+  <main class="sp" id="sp"><div class="skeleton" style="height:48px;width:60%;border-radius:10px;background:var(--wash)"></div></main>
+  <div class="tip" id="tip"></div>
   <script>
-    const slug = location.pathname.split("/").pop();
+    const slug = location.pathname.split("/").filter(Boolean).pop();
     const root = document.getElementById("sp");
+    const tip = document.getElementById("tip");
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-    const pct = (x) => x === null ? "no data" : (x * 100).toFixed(x >= 0.9995 ? 2 : 2) + "% uptime";
+    const pct = (x) => x === null ? "No data yet" : (x * 100).toFixed(2).replace(/\.00$/, "") + "% uptime";
     const ago = (ms) => { if (!ms) return "never"; const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 2160 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
-    const LABEL = { up: "Operational", late: "Late", down: "Down", new: "Waiting for data", paused: "Paused" };
+    const LABEL = { up: "Operational", late: "Degraded", down: "Down", new: "Waiting for data", paused: "Paused" };
+    const CHIP = { up: "up", late: "late", down: "down" };
+    const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0c0a08"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg>';
 
     async function load() {
       const res = await fetch("/api/status/" + slug);
-      if (!res.ok) { root.replaceChildren(el("div", "sp-head", "")); root.firstChild.append(el("h1", "", "Status page not found")); return; }
+      if (!res.ok) { root.replaceChildren(el("h1", "", "Status page not found")); return; }
       const d = await res.json();
-      document.title = d.name + " status";
+      document.title = d.name + " · Status";
       const active = d.checks.filter((c) => c.status !== "paused" && c.status !== "new");
-      const worst = active.some((c) => c.status === "down") ? "down" : active.some((c) => c.status === "late") ? "late" : "up";
-      const head = el("div", "sp-head");
-      head.append(el("h1", "", d.name));
-      const banner = el("div", "banner " + worst);
-      banner.append(el("span", "dot " + (active.length ? worst : "")),
-        el("span", "", !active.length ? "Collecting data" : worst === "down" ? "Some systems are down" : worst === "late" ? "Some systems are degraded" : "All systems operational"));
-      head.append(banner);
+      const worst = !active.length ? "none" : active.some((c) => c.status === "down") ? "down" : active.some((c) => c.status === "late") ? "late" : "up";
 
-      const list = el("div", "sp-list");
+      const top = el("div", "sp-top");
+      const left = el("div");
+      left.append(el("p", "eyebrow", "Status"), el("h1", "", d.name));
+      left.lastChild.style.marginTop = "12px";
+      top.append(left);
+
+      const banner = el("div", "sp-banner " + worst);
+      banner.append(el("span", "dot " + (worst === "none" ? "" : worst)),
+        el("span", "", { none: "Collecting data", down: "Some systems are down", late: "Some systems are degraded", up: "All systems operational" }[worst]),
+        el("small", "num", "Updated " + new Date(d.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })));
+
+      const list = el("div", "card sp-list");
+      const start = Date.parse(d.from_day + "T00:00:00Z");
       for (const c of d.checks) {
         const row = el("div", "sp-check");
-        const top = el("div", "top");
-        top.append(el("span", "dot " + c.status), el("span", "name", c.name), el("span", "state " + c.status, LABEL[c.status] || c.status));
-        top.lastChild.style.fontSize = "12px";
-        top.append(el("span", "pct", pct(c.uptime_90d)));
+        const head = el("div", "sp-row");
+        head.append(el("span", "dot " + c.status), el("span", "name", c.name), el("span", "chip " + (CHIP[c.status] || ""), LABEL[c.status] || c.status), el("span", "pct num", pct(c.uptime_90d)));
         const bars = el("div", "bars");
-        const start = Date.parse(d.from_day + "T00:00:00Z");
         c.days.forEach((u, i) => {
           const b = el("i", u === null ? "none" : u >= 0.999 ? "" : u >= 0.95 ? "minor" : "major");
-          const day = new Date(start + i * 86400000).toISOString().slice(0, 10);
-          b.title = day + ": " + (u === null ? "no data" : (u * 100).toFixed(2) + "%");
+          const day = new Date(start + i * 86400000).toLocaleDateString([], { month: "short", day: "numeric" });
+          b.dataset.tip = day + " · " + (u === null ? "no data" : (u * 100).toFixed(2) + "% uptime");
           bars.append(b);
         });
-        const legend = el("div", "bars-legend");
+        const legend = el("div", "sp-legend");
         legend.append(el("span", "", "90 days ago"),
-          el("span", "", c.status === "down" && c.down_since ? "down since " + new Date(c.down_since).toLocaleString() : (c.kind === "http" ? "checked " : "last ping ") + ago(c.last_ping_at)),
-          el("span", "", "today"));
-        row.append(top, bars, legend);
+          el("span", "", c.status === "down" && c.down_since ? "Down since " + new Date(c.down_since).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : (c.last_ping_at ? (c.kind === "http" ? "Checked " : "Last ping ") + ago(c.last_ping_at) : "Not checked yet")),
+          el("span", "", "Today"));
+        row.append(head, bars, legend);
         list.append(row);
       }
-      if (!d.checks.length) list.append(el("div", "empty", "No public checks yet."));
-      const foot = el("footer", "");
-      foot.append("Updated " + new Date(d.generated_at).toLocaleTimeString() + " · Monitored with ");
-      const a = el("a", "", "Lastping"); a.href = "/"; foot.append(a);
-      root.replaceChildren(head, list, foot);
+      if (!d.checks.length) { const e = el("div", "sp-check", "No public checks yet."); e.style.color = "var(--ash)"; list.append(e); }
+
+      const foot = el("div", "sp-foot");
+      const powered = el("a"); powered.href = "/"; powered.innerHTML = LOGO; powered.append("Powered by Lastping");
+      foot.append(el("span", "", "Times shown in your local time zone"), powered);
+      root.replaceChildren(top, banner, list, foot);
     }
+    root.addEventListener("pointermove", (e) => {
+      const t = e.target.closest("[data-tip]");
+      if (!t) { tip.classList.remove("show"); return; }
+      tip.textContent = t.dataset.tip;
+      tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px";
+      tip.style.top = e.clientY - 34 + "px";
+      tip.classList.add("show");
+    });
+    root.addEventListener("pointerleave", () => tip.classList.remove("show"));
     load();
     setInterval(load, 60000);
   </script>

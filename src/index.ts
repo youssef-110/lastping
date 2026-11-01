@@ -10,6 +10,8 @@ import {
   type Transition,
 } from "./monitor";
 import { isPublicHost, sendAlert, validAlertUrl } from "./alerts";
+import { body, CORS, HttpError, int, json, randomToken, sha256, str } from "./http";
+import { authRoute, currentUser, requireCsrfHeader } from "./auth";
 
 export interface Env {
   DB: D1Database;
@@ -25,63 +27,10 @@ const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 // ---------- small helpers ----------
 
-class HttpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, PATCH, DELETE, HEAD, OPTIONS",
-  "access-control-allow-headers": "authorization, content-type",
-};
-
-function json(data: unknown, status = 200, extra: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", ...CORS, ...extra },
-  });
-}
-
-async function sha256(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function randomToken(bytes = 24): string {
-  const raw = crypto.getRandomValues(new Uint8Array(bytes));
-  return btoa(String.fromCharCode(...raw)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function slugify(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "project";
   const suffix = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(36).padStart(2, "0")).join("").slice(0, 5);
   return `${base}-${suffix}`;
-}
-
-async function body(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const data = await req.json();
-    if (data && typeof data === "object" && !Array.isArray(data)) return data as Record<string, unknown>;
-  } catch {}
-  throw new HttpError(400, "body must be a JSON object");
-}
-
-function str(v: unknown, field: string, max: number, required = true): string | null {
-  if (v === undefined || v === null || v === "") {
-    if (required) throw new HttpError(400, `${field} is required`);
-    return null;
-  }
-  if (typeof v !== "string" || v.length > max) throw new HttpError(400, `${field} must be a string up to ${max} chars`);
-  return v.trim();
-}
-
-function int(v: unknown, field: string, min: number, max: number, fallback: number): number {
-  if (v === undefined || v === null || v === "") return fallback;
-  const n = Number(v);
-  if (!Number.isInteger(n) || n < min || n > max) throw new HttpError(400, `${field} must be an integer ${min}-${max}`);
-  return n;
 }
 
 async function rateLimit(env: Env, key: string, limit: number, windowMs: number): Promise<void> {
@@ -106,6 +55,7 @@ interface Project {
   name: string;
   token_hash: string;
   alert_url: string | null;
+  user_id: string | null;
   created_at: number;
 }
 
@@ -149,12 +99,21 @@ async function commit(env: Env, check: Check & { project_id: string; name: strin
   }
 }
 
+/** A project is managed with its key (Bearer) or by the signed-in account that owns it. */
 async function auth(req: Request, env: Env, slug: string): Promise<Project> {
   const header = req.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   const project = await env.DB.prepare("SELECT * FROM projects WHERE slug = ?").bind(slug).first<Project>();
-  if (!project || !token || (await sha256(token)) !== project.token_hash) throw new HttpError(401, "invalid project or key");
-  return project;
+  if (!project) throw new HttpError(401, "invalid project or key");
+  if (token && (await sha256(token)) === project.token_hash) return project;
+  if (!token && project.user_id) {
+    const user = await currentUser(req, env);
+    if (user?.id === project.user_id) {
+      requireCsrfHeader(req);
+      return project;
+    }
+  }
+  throw new HttpError(401, "invalid project or key");
 }
 
 async function checkWithProject(req: Request, env: Env, id: string): Promise<{ project: Project; check: Check & { project_id: string } }> {
@@ -236,6 +195,39 @@ async function handlePing(req: Request, env: Env, id: string, suffix: string | u
   return new Response("OK\n", { headers: { "content-type": "text/plain", ...CORS } });
 }
 
+interface UptimeSummary {
+  days: (number | null)[];
+  uptime: number | null;
+  down_since: number | null;
+}
+
+/** Per-day uptime for several checks, rebuilt from their up/down transitions in one D1 batch. */
+async function uptimeFor(env: Env, checks: Check[], days: number, now = Date.now()): Promise<Map<string, UptimeSummary>> {
+  const from = Math.floor(now / 86400_000) * 86400_000 - (days - 1) * 86400_000;
+  const out = new Map<string, UptimeSummary>();
+  if (!checks.length) return out;
+  const res = await env.DB.batch(
+    checks.flatMap((c) => [
+      env.DB.prepare("SELECT at, kind FROM events WHERE check_id = ? AND kind IN ('up','down') AND at >= ? ORDER BY at").bind(c.id, from),
+      env.DB.prepare("SELECT kind FROM events WHERE check_id = ? AND kind IN ('up','down') AND at < ? ORDER BY at DESC LIMIT 1").bind(c.id, from),
+    ]),
+  );
+  checks.forEach((c, i) => {
+    const transitions = (res[i * 2].results as { at: number; kind: "up" | "down" }[]).map((t) => ({ at: t.at, to: t.kind }) as Transition);
+    const downAtStart = (res[i * 2 + 1].results[0] as { kind?: string } | undefined)?.kind === "down";
+    const buckets = uptimeByDay(transitions, downAtStart, c.created_at, now, days);
+    const totalMs = now - Math.max(from, c.created_at);
+    const downMs = buckets.reduce((s, b) => s + b.downMs, 0);
+    const lastDown = [...transitions].reverse().find((t) => t.to === "down");
+    out.set(c.id, {
+      days: buckets.map((b) => (b.uptime === null ? null : Math.round(b.uptime * 10000) / 10000)),
+      uptime: totalMs > 0 ? Math.max(0, 1 - downMs / totalMs) : null,
+      down_since: c.status === "down" ? (lastDown?.at ?? null) : null,
+    });
+  });
+  return out;
+}
+
 async function publicStatus(env: Env, slug: string) {
   const project = await env.DB.prepare("SELECT id, slug, name, created_at FROM projects WHERE slug = ?").bind(slug).first<Project>();
   if (!project) throw new HttpError(404, "status page not found");
@@ -244,32 +236,20 @@ async function publicStatus(env: Env, slug: string) {
   ).bind(project.id).all<Check & { name: string }>();
   const now = Date.now();
   const days = 90;
-  const from = Math.floor(now / 86400_000) * 86400_000 - (days - 1) * 86400_000;
-
-  const out = [];
-  for (const c of checks) {
-    const [{ results: trans }, prior] = await env.DB.batch([
-      env.DB.prepare("SELECT at, kind FROM events WHERE check_id = ? AND kind IN ('up','down') AND at >= ? ORDER BY at").bind(c.id, from),
-      env.DB.prepare("SELECT kind FROM events WHERE check_id = ? AND kind IN ('up','down') AND at < ? ORDER BY at DESC LIMIT 1").bind(c.id, from),
-    ]);
-    const transitions = (trans as { at: number; kind: "up" | "down" }[]).map((t) => ({ at: t.at, to: t.kind }) as Transition);
-    const downAtStart = (prior.results[0] as { kind?: string } | undefined)?.kind === "down";
-    const buckets = uptimeByDay(transitions, downAtStart, c.created_at, now, days);
-    const totalMs = now - Math.max(from, c.created_at);
-    const downMs = buckets.reduce((s, b) => s + b.downMs, 0);
-    const lastDown = [...transitions].reverse().find((t) => t.to === "down");
-    out.push({
-      name: c.name,
-      kind: c.kind,
-      status: c.status,
-      last_ping_at: c.last_ping_at,
-      last_duration_ms: c.last_duration_ms,
-      uptime_90d: totalMs ? Math.max(0, 1 - downMs / totalMs) : null,
-      down_since: c.status === "down" ? (lastDown?.at ?? null) : null,
-      days: buckets.map((b) => (b.uptime === null ? null : Math.round(b.uptime * 10000) / 10000)),
-    });
-  }
-  return { name: project.name, slug: project.slug, generated_at: now, from_day: new Date(from).toISOString().slice(0, 10), checks: out };
+  const uptime = await uptimeFor(env, checks, days, now);
+  return {
+    name: project.name,
+    slug: project.slug,
+    generated_at: now,
+    from_day: new Date(Math.floor(now / 86400_000) * 86400_000 - (days - 1) * 86400_000).toISOString().slice(0, 10),
+    checks: checks.map((c) => {
+      const u = uptime.get(c.id)!;
+      return {
+        name: c.name, kind: c.kind, status: c.status, last_ping_at: c.last_ping_at, last_duration_ms: c.last_duration_ms,
+        uptime_90d: u.uptime, down_since: u.down_since, days: u.days,
+      };
+    }),
+  };
 }
 
 function overall(statuses: string[]): { label: string; color: string } {
@@ -329,15 +309,37 @@ async function route(req: Request, env: Env): Promise<Response> {
     return json(await publicStatus(env, r[1]), 200, { "cache-control": "max-age=30" });
   }
 
+  if (path.startsWith("/api/auth/") || path.startsWith("/api/me")) {
+    const res = await authRoute(req, env, path);
+    if (res) return res;
+  }
+
+  if (path === "/api/stats" && req.method === "GET") {
+    const since = Date.now() - 86400_000;
+    const [checks, signals, projects] = await env.DB.batch([
+      env.DB.prepare("SELECT COUNT(*) AS n, SUM(status = 'up') AS up FROM checks WHERE status != 'paused'"),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE at > ? AND kind IN ('ping','start','fail','up','down')").bind(since),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM projects"),
+    ]);
+    const c = checks.results[0] as { n: number; up: number | null };
+    return json(
+      { checks: c.n, up: c.up ?? 0, signals_24h: (signals.results[0] as { n: number }).n, projects: (projects.results[0] as { n: number }).n },
+      200,
+      { "cache-control": "max-age=60" },
+    );
+  }
+
   if (path === "/api/projects" && req.method === "POST") {
+    const user = await currentUser(req, env);
+    if (user) requireCsrfHeader(req);
     const ip = req.headers.get("cf-connecting-ip") ?? "local";
-    await rateLimit(env, `project:${ip}`, PROJECTS_PER_IP_PER_DAY, 86400_000);
+    await rateLimit(env, user ? `project-user:${user.id}` : `project:${ip}`, PROJECTS_PER_IP_PER_DAY * (user ? 4 : 1), 86400_000);
     const b = await body(req);
     const name = str(b.name, "name", 60)!;
     const token = randomToken();
     const project = { id: crypto.randomUUID(), slug: slugify(name), name, created_at: Date.now() };
-    await env.DB.prepare("INSERT INTO projects (id, slug, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(project.id, project.slug, name, await sha256(token), project.created_at)
+    await env.DB.prepare("INSERT INTO projects (id, slug, name, token_hash, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(project.id, project.slug, name, await sha256(token), user?.id ?? null, project.created_at)
       .run();
     return json({ project: { slug: project.slug, name }, token }, 201);
   }
@@ -346,9 +348,10 @@ async function route(req: Request, env: Env): Promise<Response> {
     const project = await auth(req, env, r[1]);
     if (req.method === "GET") {
       const { results } = await env.DB.prepare("SELECT * FROM checks WHERE project_id = ? ORDER BY created_at").bind(project.id).all<Check & Record<string, unknown>>();
+      const uptime = await uptimeFor(env, results, 30);
       return json({
-        project: { slug: project.slug, name: project.name, alert_url: project.alert_url, created_at: project.created_at },
-        checks: results.map((c) => publicCheckJson(c, env.PUBLIC_URL)),
+        project: { slug: project.slug, name: project.name, alert_url: project.alert_url, created_at: project.created_at, owned: !!project.user_id },
+        checks: results.map((c) => ({ ...publicCheckJson(c, env.PUBLIC_URL), uptime_30d: uptime.get(c.id)!.uptime, days: uptime.get(c.id)!.days })),
         now: Date.now(),
       });
     }

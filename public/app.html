@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lastping</title>
+  <meta name="theme-color" content="#f4f2f0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <a class="logo" href="#/" aria-label="Lastping projects">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0c0a08"/><path d="M5.5 17h5l2.6-6.5 4.2 12 2.6-5.5h2.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25.6" cy="17" r="2.7" fill="#e4f222"/></svg>
+        <span>lastping</span>
+      </a>
+      <div class="crumbs" id="crumbs"></div>
+      <div class="topbar-right" id="userArea"></div>
+    </div>
+  </header>
+
+  <main class="view" id="view" tabindex="-1"></main>
+
+  <div class="drawer-scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Check details"></aside>
+
+  <dialog class="modal" id="modal"></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/vendor/simplewebauthn.js"></script>
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>
