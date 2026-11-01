@@ -1,6 +1,6 @@
 /* ---------- announcement + nav ---------- */
 .announce { background: var(--paper); border-bottom: 1px solid var(--hairline); font-size: 13px; }
-.announce .container { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; text-align: center; flex-wrap: wrap; padding-block: 6px; }
+.announce .container { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; text-align: center; flex-wrap: wrap; padding-block: 10px; }
 .announce a { font-weight: 500; text-underline-offset: 3px; }
 .announce-tag { background: var(--accent); border-radius: var(--r-btn); padding: 2px 7px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
 
@@ -22,7 +22,7 @@
 /* ---------- hero ---------- */
 .hero { padding: 88px 0 72px; overflow: hidden; }
 .hero-copy { max-width: 760px; }
-.hero h1 { font-size: clamp(42px, 7vw, 76px); line-height: 0.98; letter-spacing: -0.045em; margin: 18px 0 22px; }
+.hero h1 { font-size: clamp(42px, 7vw, 76px); line-height: 0.98; letter-spacing: -0.045em; margin: 0 0 22px; }
 .hero-sub { font-size: clamp(17px, 2vw, 20px); line-height: 1.45; color: var(--ash); max-width: 600px; }
 .composite { display: flex; gap: 8px; max-width: 520px; margin-top: 34px; }
 .composite .input { height: 48px; padding-left: 18px; }
@@ -90,14 +90,12 @@
 @media (max-width: 860px) { .works-grid { grid-template-columns: repeat(3, 1fr); } .works-grid .works-dark { grid-column: span 3; } }
 
 /* ---------- live ticker ---------- */
-.ticker { background: var(--obsidian); color: var(--paper); }
-.ticker-row { display: flex; align-items: center; gap: 48px; min-height: 76px; overflow-x: auto; scrollbar-width: none; }
+.ticker { background: var(--obsidian); color: var(--paper); padding-block: 24px; }
+.ticker-row { display: flex; align-items: center; gap: 48px; min-height: 28px; overflow-x: auto; scrollbar-width: none; }
 .ticker-row > div { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
 .ticker .eyebrow { color: #a3a19e; }
 .ticker b { font-weight: 400; font-size: 18px; transition: opacity 300ms var(--ease); }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); align-self: center; animation: live 2s ease-in-out infinite; }
-@keyframes live { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); align-self: center; }
 
 /* ---------- sections ---------- */
 .section-head { max-width: 720px; margin-bottom: 56px; }
@@ -146,9 +144,9 @@
 /* how */
 .how { padding: 96px 0; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.step { padding: 28px 24px 30px; }
+.step { padding: 28px 24px 30px; min-height: 180px; }
 .step-n { font: 13px var(--mono); color: var(--ash); }
-.step h3 { font-size: 22px; letter-spacing: -0.02em; margin: 44px 0 10px; }
+.step h3 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 10px; }
 .step p { color: var(--ash); font-size: 15px; }
 .step code { background: var(--wash); padding: 1px 5px; border-radius: 4px; }
 @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } .step h3 { margin-top: 22px; } }
@@ -201,8 +199,8 @@
 @media (max-width: 800px) { .faq-grid { grid-template-columns: 1fr; gap: 24px; } }
 
 /* final + footer */
-.final { background: var(--obsidian); color: var(--paper); }
-.final-row { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding-block: 96px; flex-wrap: wrap; }
+.final { background: var(--obsidian); color: var(--paper); padding-block: 96px; }
+.final-row { display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
 .final h2 { font-size: clamp(32px, 5vw, 56px); line-height: 1.02; letter-spacing: -0.04em; max-width: 680px; }
 .footer { background: var(--obsidian); color: #b9b7b4; border-top: 1px solid #2c2b29; }
 .footer-row { display: flex; justify-content: space-between; gap: 48px; padding-block: 56px 40px; flex-wrap: wrap; }

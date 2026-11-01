@@ -226,14 +226,15 @@ export async function authRoute(req: Request, env: AuthEnv, path: string): Promi
     requireCsrfHeader(req);
     const b = await body(req);
     const list = Array.isArray(b.projects) ? b.projects.slice(0, 50) : [];
-    let claimed = 0;
+    const claimed: string[] = [];
     for (const p of list as { slug?: unknown; token?: unknown }[]) {
       if (typeof p.slug !== "string" || typeof p.token !== "string") continue;
-      const r = await env.DB.prepare("UPDATE projects SET user_id = ? WHERE slug = ? AND token_hash = ? AND user_id IS NULL")
-        .bind(user.id, p.slug, await sha256(p.token)).run();
-      claimed += r.meta.changes ?? 0;
+      // The key is rotated to a value nobody knows, so whoever held the old key loses access once it's claimed.
+      const r = await env.DB.prepare("UPDATE projects SET user_id = ?, token_hash = ? WHERE slug = ? AND token_hash = ? AND user_id IS NULL")
+        .bind(user.id, await sha256(randomToken(32)), p.slug, await sha256(p.token)).run();
+      if (r.meta.changes) claimed.push(p.slug);
     }
-    return json({ claimed });
+    return json({ claimed: claimed.length, slugs: claimed });
   }
 
   if (path.startsWith("/api/me/passkeys/") && req.method === "DELETE") {
@@ -242,7 +243,12 @@ export async function authRoute(req: Request, env: AuthEnv, path: string): Promi
     requireCsrfHeader(req);
     const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM credentials WHERE user_id = ?").bind(user.id).first<{ n: number }>();
     if ((count?.n ?? 0) <= 1) throw new HttpError(400, "you can't remove your only passkey");
-    await env.DB.prepare("DELETE FROM credentials WHERE id = ? AND user_id = ?").bind(decodeURIComponent(path.slice(17)), user.id).run();
+    // A removed passkey may belong to a lost device: end every other session along with it.
+    const current = await sha256(cookie(req, SESSION_COOKIE) ?? "");
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM credentials WHERE id = ? AND user_id = ?").bind(decodeURIComponent(path.slice(17)), user.id),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(user.id, current),
+    ]);
     return json({ ok: true });
   }
 

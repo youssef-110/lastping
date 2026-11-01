@@ -23,8 +23,16 @@ $("heroForm").addEventListener("submit", async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Something went wrong");
-    // Hand the key to the dashboard; it stores it and shows onboarding.
-    location.href = `/app#/p/${data.project.slug}?key=${data.token}&welcome=1`;
+    // Same origin as the dashboard: store the key directly instead of passing it through the URL.
+    // Signed-in users get an account-owned project and need no key at all.
+    const me = await fetch("/api/me").then((r) => r.json()).catch(() => ({}));
+    if (!me.user) {
+      let list = [];
+      try { list = JSON.parse(localStorage.getItem("lastping:projects")) || []; } catch {}
+      list.unshift({ slug: data.project.slug, name: data.project.name, token: data.token, mine: true });
+      try { localStorage.setItem("lastping:projects", JSON.stringify(list)); } catch {}
+    }
+    location.href = `/app#/p/${data.project.slug}?welcome=1`;
   } catch (err) {
     $("heroNote").textContent = err.message;
     btn.disabled = false;

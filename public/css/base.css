@@ -8,8 +8,8 @@
   --paper: #ffffff;
   --bone: #f4f2f0;
   --wash: #efece8;
-  --ash: #6d6c6b;
-  --faint: #9b9997;
+  --ash: #605f5d;
+  --faint: #767472;
   --hairline: #e5e2dc;
   --smoke: #d3d1cc;
   --up: #1a1919;
@@ -18,8 +18,8 @@
   --down-wash: #fdeceb;
   --late-wash: #fdf3e0;
 
-  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --r-btn: 6px;
   --r-input: 10px;

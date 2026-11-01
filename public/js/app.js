@@ -120,11 +120,17 @@ async function loadMe() {
   } catch { me = null; }
 }
 
-async function claimLocal() {
-  const list = local.all();
+/**
+ * Moves locally keyed projects into the account. Automatic claims (at sign-in) only take projects
+ * created on this device (`mine`); keys imported from someone's link need an explicit click.
+ * The server rotates claimed keys, so the local copies are dropped afterwards.
+ */
+async function claimLocal({ onlyMine = true, slugs = null } = {}) {
+  const list = local.all().filter((p) => (slugs ? slugs.includes(p.slug) : !onlyMine || p.mine));
   if (!me || !list.length) return 0;
-  const { claimed } = await api("/api/me/claim", { method: "POST", body: { projects: list.map((p) => ({ slug: p.slug, token: p.token })) } });
-  return claimed;
+  const r = await api("/api/me/claim", { method: "POST", body: { projects: list.map((p) => ({ slug: p.slug, token: p.token })) } });
+  r.slugs.forEach((s) => local.remove(s));
+  return r.claimed;
 }
 
 async function passkeySignIn() {
@@ -215,11 +221,11 @@ async function importKey(slug, key) {
     const res = await fetch(`/api/projects/${slug}`, { headers: { authorization: `Bearer ${key}` } });
     if (!res.ok) throw new Error();
     const d = await res.json();
-    if (existing && !confirm(`Replace the saved key for "${existing.name}" with the one from this link?`)) return;
-    local.put({ slug, name: d.project.name, token: key });
-    if (me && !d.project.owned) {
-      await api("/api/me/claim", { method: "POST", body: { projects: [{ slug, token: key }] } }).catch(() => {});
-    }
+    const question = existing
+      ? `Replace the saved key for "${existing.name}" with the one from this link?`
+      : `Open the project "${d.project.name}" from this link on this device?`;
+    if (!confirm(question)) return;
+    local.put({ slug, name: d.project.name, token: key, mine: false });
   } catch {
     toast("That dashboard link is invalid");
   }
@@ -293,7 +299,7 @@ async function renderHome() {
   if (unclaimed.length) {
     banners.push(h("div", { class: "banner accent" },
       h("p", {}, h("b", {}, `${unclaimed.length} project${unclaimed.length > 1 ? "s are" : " is"} only on this device. `), "Add them to your account to manage them anywhere."),
-      h("button", { class: "btn btn-dark", onclick: async () => { const n = await claimLocal(); await loadMe(); toast(`${n} added to your account`); renderHome(); } }, "Add to account")));
+      h("button", { class: "btn btn-dark", onclick: async () => { const n = await claimLocal({ onlyMine: false }); await loadMe(); toast(`${n} added to your account`); renderHome(); } }, "Add to account")));
   }
 
   if (!cards.length) {
@@ -342,7 +348,7 @@ function renderNew() {
           e.submitter.disabled = true;
           try {
             const r = await api("/api/projects", { method: "POST", body: { name: input.value.trim() } });
-            if (!me) local.put({ slug: r.project.slug, name: r.project.name, token: r.token });
+            if (!me) local.put({ slug: r.project.slug, name: r.project.name, token: r.token, mine: true });
             await loadMe();
             location.hash = `#/p/${r.project.slug}?welcome=1`;
           } catch (ex) {
@@ -403,7 +409,7 @@ async function renderProject(slug, { welcome = false, silent = false } = {}) {
     banners.push(me
       ? h("div", { class: "banner accent" },
           h("p", {}, h("b", {}, "This project is only on this device. "), "Add it to your account so it's safe and available everywhere."),
-          h("button", { class: "btn btn-dark", onclick: async () => { await api("/api/me/claim", { method: "POST", body: { projects: [{ slug, token: key }] } }); await loadMe(); toast("Added to your account"); renderProject(slug, { silent: true }); } }, "Add to account"))
+          h("button", { class: "btn btn-dark", onclick: async () => { await claimLocal({ slugs: [slug] }); await loadMe(); toast("Added to your account"); renderProject(slug, { silent: true }); } }, "Add to account"))
       : h("div", { class: "banner dark" },
           h("p", {}, h("b", {}, welcome ? "Project created. " : "Saved in this browser only. "), "Sign in with a passkey to keep it on all your devices, or save this private link."),
           h("a", { class: "btn btn-primary", href: "#/signin" }, "Sign in"),

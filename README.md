@@ -73,7 +73,7 @@ Signing in is optional, and it uses **passkeys (WebAuthn)**: Touch ID, Face ID, 
 - Challenges are single-use: the row is deleted as it is read, and it expires after 5 minutes.
 - Sessions use an `HttpOnly; Secure; SameSite=Lax` cookie holding a random 256-bit token. Only its hash is stored, and it expires after 30 days.
 - Cookie-authenticated writes must send an `x-lastping` header, a CSRF guard that a cross-site form can't satisfy.
-- Projects made before signing in are moved into your account automatically, using the keys already in your browser.
+- Projects created on this device before signing in move into your account automatically. Keys opened from someone else's link are only claimed when you click. Claiming rotates the project key, so the old key and links stop working.
 
 ### Security model
 

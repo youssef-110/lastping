@@ -11,7 +11,7 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/landing.css">
   <script>
@@ -52,7 +52,6 @@
     <section class="hero">
       <div class="container">
         <div class="hero-copy">
-          <p class="eyebrow">Cron · heartbeat · uptime monitoring</p>
           <h1>Know the moment your jobs stop running.</h1>
           <p class="hero-sub">Backups, cron jobs and workers fail silently. Lastping expects a ping on schedule and alerts you the minute one goes missing, so you never find out from a customer.</p>
           <form class="composite" id="heroForm">
@@ -76,7 +75,7 @@
               <div class="mock-stats">
                 <div><span class="num" id="mUp">5</span><small>up</small></div>
                 <div><span class="num" id="mDown">0</span><small>down</small></div>
-                <div><span class="num">99.98%</span><small>30-day uptime</small></div>
+                <div><span>99.98%</span><small>30-day uptime</small></div>
               </div>
             </div>
             <div class="mock-table" id="mockRows"></div>
@@ -200,9 +199,9 @@
           <h2>Three steps. About sixty seconds.</h2>
         </div>
         <div class="steps">
-          <div class="step card"><span class="step-n">01</span><h3>Create a check</h3><p>Name it and set the schedule your job runs on, or paste a URL to watch.</p></div>
-          <div class="step card"><span class="step-n">02</span><h3>Add one line</h3><p>Append a <code>curl</code> to your job. No agent, no SDK, no config files.</p></div>
-          <div class="step card"><span class="step-n">03</span><h3>Get alerted</h3><p>Missed ping or failed probe: one alert, then one more when it recovers.</p></div>
+          <div class="step card"><h3>Create a check</h3><p>Name it and set the schedule your job runs on, or paste a URL to watch.</p></div>
+          <div class="step card"><h3>Add one line</h3><p>Append a <code>curl</code> to your job. No agent, no SDK, no config files.</p></div>
+          <div class="step card"><h3>Get alerted</h3><p>Missed ping or failed probe: one alert, then one more when it recovers.</p></div>
         </div>
       </div>
     </section>

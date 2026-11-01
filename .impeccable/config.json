@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "public/css/landing.css"
+        ],
+        "createdAt": "2026-11-01T00:31:54.427Z",
+        "reason": "Claude: false positive, border-left+border-bottom on .ticks li::before draw a rotated checkmark glyph, not a card side-tab"
+      }
+    ]
+  }
+}
