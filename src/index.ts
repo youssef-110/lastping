@@ -87,7 +87,7 @@ async function commit(env: Env, check: Check & { project_id: string; name: strin
   if (out.transition) {
     const project = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(check.project_id).first<Project>();
     if (project?.alert_url) {
-      await sendAlert(project.alert_url, {
+      const result = await sendAlert(project.alert_url, {
         project: project.name,
         check: check.name,
         status: out.transition,
@@ -95,6 +95,11 @@ async function commit(env: Env, check: Check & { project_id: string; name: strin
         at: now,
         statusPage: `${env.PUBLIC_URL}/s/${project.slug}`,
       });
+      // A failed delivery shows up in the check activity instead of disappearing.
+      if (!result.ok) {
+        await env.DB.prepare("INSERT INTO events (check_id, at, kind, detail) VALUES (?, ?, 'alert_fail', ?)")
+          .bind(check.id, now, (result.error ?? "unknown error").slice(0, 500)).run();
+      }
     }
   }
 }
@@ -380,10 +385,11 @@ async function route(req: Request, env: Env): Promise<Response> {
     const project = await auth(req, env, r[1]);
     if (!project.alert_url) throw new HttpError(400, "set an alert URL first");
     await rateLimit(env, `alert-test:${project.id}`, 10, 3600_000);
-    const ok = await sendAlert(project.alert_url, {
+    const result = await sendAlert(project.alert_url, {
       project: project.name, check: "test", status: "test", at: Date.now(), statusPage: `${env.PUBLIC_URL}/s/${project.slug}`,
     });
-    return json({ ok }, ok ? 200 : 502);
+    if (!result.ok) throw new HttpError(502, `alert endpoint rejected the test: ${result.error}`);
+    return json({ ok: true });
   }
 
   if ((r = m("/api/projects/([a-z0-9-]+)/checks")) && req.method === "POST") {

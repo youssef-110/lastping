@@ -64,13 +64,15 @@ export function formatAlert(url: string, p: AlertPayload): { body: string; heade
   return { body: JSON.stringify({ ...p, message: line }), headers: { "content-type": "application/json" } };
 }
 
-export async function sendAlert(url: string, p: AlertPayload): Promise<boolean> {
-  if (!validAlertUrl(url)) return false;
+export async function sendAlert(url: string, p: AlertPayload): Promise<{ ok: boolean; error?: string }> {
+  if (!validAlertUrl(url)) return { ok: false, error: "alert URL is not an https URL on a public host" };
   const { body, headers } = formatAlert(url, p);
   try {
     const res = await fetch(url, { method: "POST", body, headers, redirect: "manual", signal: AbortSignal.timeout(5000) });
-    return res.ok;
-  } catch {
-    return false;
+    if (res.ok) return { ok: true };
+    const text = (await res.text().catch(() => "")).slice(0, 200);
+    return { ok: false, error: `HTTP ${res.status}${text ? `: ${text}` : ""}` };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
   }
 }

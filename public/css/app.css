@@ -179,7 +179,7 @@
 .timeline li:last-child { border-bottom: 0; }
 .timeline .tdot { width: 8px; height: 8px; border-radius: 50%; background: var(--smoke); margin-top: 7px; }
 .timeline .tdot.up, .timeline .tdot.ping { background: var(--ink); }
-.timeline .tdot.down, .timeline .tdot.fail, .timeline .tdot.probe_fail { background: var(--down); }
+.timeline .tdot.down, .timeline .tdot.fail, .timeline .tdot.probe_fail, .timeline .tdot.alert_fail { background: var(--down); }
 .timeline .tdot.late { background: var(--late); }
 .timeline .what b { font-weight: 500; }
 .timeline .what small { display: block; color: var(--ash); font-size: 13px; margin-top: 2px; word-break: break-word; }

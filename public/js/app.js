@@ -619,6 +619,7 @@ function setupTab(body, c) {
 const EVENT_TEXT = {
   ping: "Ping received", start: "Job started", fail: "Job reported failure", late: "Running late",
   down: "Went down", up: "Recovered", probe_fail: "Probe failed", paused: "Paused", resumed: "Resumed",
+  alert_fail: "Alert could not be delivered",
 };
 async function activityTab(body, c) {
   clear(body, h("div", { class: "skeleton" }), h("div", { class: "skeleton" }));
@@ -790,14 +791,14 @@ function openCheckModal(slug, kind = "heartbeat") {
 
 // ---------- project settings ----------
 const CHANNELS = {
-  ntfy: { label: "Phone push (ntfy)", placeholder: "https://ntfy.sh/pick-a-secret-topic", help: "Install the free ntfy app, subscribe to a topic name only you know, and paste its URL here." },
-  discord: { label: "Discord", placeholder: "https://discord.com/api/webhooks/…", help: "Channel settings → Integrations → Webhooks → New webhook → Copy URL." },
+  discord: { label: "Discord", placeholder: "https://discord.com/api/webhooks/…", help: "Recommended. Channel settings → Integrations → Webhooks → New webhook → Copy URL. Turn on Discord notifications on your phone for push alerts." },
+  ntfy: { label: "Phone push (ntfy)", placeholder: "https://ntfy.sh/your-topic?auth=…", help: "ntfy.sh limits anonymous messages per IP, and Lastping shares cloud IPs, so use your own: create a free ntfy.sh account, make an access token, and add ?auth=<base64 of \"Bearer tk_…\"> to the topic URL. A self-hosted ntfy server works without a token." },
   slack: { label: "Slack", placeholder: "https://hooks.slack.com/services/…", help: "Create an Incoming Webhook in your Slack app settings and paste its URL." },
   webhook: { label: "Webhook", placeholder: "https://example.com/hooks/lastping", help: "Lastping POSTs JSON with project, check, status, detail and a status page link." },
 };
 function guessChannel(url) {
   const n = url ? channelName(url) : "";
-  return n === "Discord" ? "discord" : n === "Slack" ? "slack" : n === "ntfy push" ? "ntfy" : url ? "webhook" : "ntfy";
+  return n === "Discord" ? "discord" : n === "Slack" ? "slack" : n === "ntfy push" ? "ntfy" : url ? "webhook" : "discord";
 }
 
 function openProjectSettings(slug) {
