@@ -370,6 +370,7 @@ function renderNew() {
 
 // ---------- project ----------
 let current = null; // { slug, data }
+const seen = new Map(); // check id -> last rendered status, for change flashes
 
 async function renderProject(slug, { welcome = false, silent = false } = {}) {
   if (!silent) mount([h("div", { class: "skeleton", style: "height:90px" }), h("div", { class: "skeleton", style: "height:300px" })], [{ label: "Projects", href: "#/" }, { label: slug }]);
@@ -454,6 +455,14 @@ async function renderProject(slug, { welcome = false, silent = false } = {}) {
     table,
   ], [{ label: "Projects", href: "#/" }, { label: p.name }]);
 
+  // Flash rows whose status changed since the last render (not on first load).
+  for (const c of checks) {
+    const before = seen.get(c.id);
+    if (before && before !== c.status && (c.status === "down" || c.status === "up")) {
+      view.querySelector(`.trow[data-id="${c.id}"]`)?.classList.add(`flash-${c.status}`);
+    }
+    seen.set(c.id, c.status);
+  }
   if (drawerState?.slug === slug) renderDrawer();
   clearInterval(pollTimer);
   pollTimer = setInterval(() => { if (!modal.open) refreshProject(slug); }, 15_000);
@@ -495,7 +504,7 @@ function channelName(url) {
 
 // ---------- drawer ----------
 function openDrawer(slug, id, tab = "setup") {
-  drawerState = { slug, id, tab };
+  drawerState = { slug, id, tab, fresh: true };
   document.querySelectorAll(".trow").forEach((r) => r.classList.toggle("active", r.dataset.id === id));
   renderDrawer();
   drawerEl.classList.add("open");
@@ -519,7 +528,8 @@ function renderDrawer() {
   const c = current.data.checks.find((x) => x.id === drawerState.id);
   if (!c) return closeDrawer();
   const tabs = [["setup", "Setup"], ["activity", "Activity"], ["settings", "Settings"]];
-  const body = h("div", { class: "dr-body" });
+  const body = h("div", { class: `dr-body${drawerState.fresh ? " fresh" : ""}` });
+  drawerState.fresh = false; // background refreshes re-render without replaying the fade
   clear(drawerEl,
     h("div", { class: "dr-head" },
       h("div", { class: "dr-title" },
@@ -529,7 +539,7 @@ function renderDrawer() {
         h("button", { class: "btn btn-ghost btn-icon btn-sm", "aria-label": "Close", onclick: () => closeDrawer(), html: ICON.x })),
       h("div", { class: "dr-meta" }, `${c.kind === "http" ? "Uptime check" : "Heartbeat"} · ${schedule(c)}${c.kind === "heartbeat" ? ` · grace ${dur(c.grace_s)}` : ""}`),
       h("div", { class: "dr-tabs", role: "tablist" },
-        tabs.map(([k, label]) => h("button", { role: "tab", "aria-selected": String(drawerState.tab === k), onclick: () => { drawerState.tab = k; renderDrawer(); } }, label)))),
+        tabs.map(([k, label]) => h("button", { role: "tab", "aria-selected": String(drawerState.tab === k), onclick: () => { drawerState.tab = k; drawerState.fresh = true; renderDrawer(); } }, label)))),
     body);
   clearInterval(drawerEl._poll);
   if (drawerState.tab === "setup") setupTab(body, c);
@@ -552,6 +562,8 @@ function setupTab(body, c) {
   const now = current.data.now;
   if (c.kind === "heartbeat") {
     const waiting = !c.last_ping_at;
+    const firstPing = !waiting && drawerState.waiting === true; // it arrived while the drawer was open
+    drawerState.waiting = waiting;
     const state = waiting
       ? h("div", { class: "waiting" }, h("span", { class: "pulse" }),
           h("p", {}, "Waiting for the first ping…", h("small", {}, "Add the line below to your job, or send a test ping now.")),
@@ -560,8 +572,8 @@ function setupTab(body, c) {
             await fetch(c.ping_url, { method: "POST", body: "test ping from the dashboard" }).catch(() => {});
             await refreshProject(current.slug);
           } }, "Send test ping"))
-      : h("div", { class: `waiting ${c.status === "down" ? "bad" : "ok"}` }, h("span", { class: "pulse" }),
-          h("p", {}, c.status === "down" ? "This check is down" : "Receiving pings",
+      : h("div", { class: `waiting ${c.status === "down" ? "bad" : "ok"}${firstPing ? " burst" : ""}` }, h("span", { class: "pulse" }),
+          h("p", {}, c.status === "down" ? "This check is down" : firstPing ? "First ping received" : "Receiving pings",
             h("small", {}, `Last ping ${ago(c.last_ping_at, now)}${c.due_at ? ` · next expected ${new Date(c.due_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` : ""}`)));
     const snips = snippets(c.ping_url);
     const pre = h("pre", {}, snips.curl);

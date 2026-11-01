@@ -213,3 +213,115 @@
 .footer-cols a:hover { color: var(--paper); }
 .footer-base { padding-block: 22px 32px; font-size: 13px; color: #8d8b88; border-top: 1px solid #2c2b29; }
 @media (max-width: 560px) { .announce .long { display: none; } }
+
+/* =====================================================================
+   Motion. Everything below only applies under html.motion, which is set
+   when JS runs and the visitor hasn't asked for reduced motion.
+   Enter = ease-out-quint, on-screen movement = ease-in-out, hover = ease.
+   ===================================================================== */
+:root {
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+/* nav picks up depth once the page scrolls */
+.nav { transition: box-shadow 300ms ease, background-color 300ms ease; }
+.nav.scrolled { box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.6), 0 8px 30px -20px rgba(12, 10, 8, 0.25); }
+
+/* CTA arrow nudge (hover-capable pointers only) */
+.btn .arr { display: inline-block; transition: translate 200ms var(--ease-out-quint); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover .arr { translate: 3px 0; }
+  .works-grid > div:not(.works-dark) { transition: background-color 150ms ease, color 150ms ease; }
+  .works-grid > div:not(.works-dark):hover { background: var(--paper); color: var(--ink); }
+  .step, .plan, .pcard { transition: border-color 200ms ease, translate 300ms var(--ease-out-quint); }
+  .step:hover { border-color: var(--smoke); translate: 0 -3px; }
+}
+
+/* ---------- hero headline: words rise out of a mask ---------- */
+.hero h1 .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.06em; margin-bottom: -0.06em; }
+.hero h1 .wi { display: inline-block; }
+.motion .hero h1 .wi { translate: 0 108%; animation: wordUp 900ms var(--ease-out-quint) forwards; animation-delay: calc(80ms + var(--i) * 55ms); }
+@keyframes wordUp { to { translate: 0 0; } }
+.motion .hero-sub, .motion .composite, .motion .hero-note {
+  opacity: 0; translate: 0 14px; animation: fadeUp 800ms var(--ease-out-quint) forwards;
+}
+.motion .hero-sub { animation-delay: 420ms; }
+.motion .composite { animation-delay: 520ms; }
+.motion .hero-note { animation-delay: 600ms; }
+@keyframes fadeUp { to { opacity: 1; translate: 0 0; } }
+
+/* ---------- heartbeat signal ---------- */
+.signal { position: relative; height: 84px; margin-top: 56px; }
+.signal-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 100%); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 100%); }
+.signal-path { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.signal-head { position: absolute; top: 50%; right: 0; width: 14px; height: 14px; margin: -7px -7px 0 0; }
+.signal-dot { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); box-shadow: inset 0 0 0 2px var(--ink); transition: background-color 200ms ease, scale 200ms var(--ease-out-quint); }
+.signal-ring { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--ink); opacity: 0; }
+.signal-head.ping .signal-ring { animation: sigRing 900ms var(--ease-out-quint); }
+.signal-head.ping .signal-dot { scale: 1.25; }
+.signal-head.miss .signal-dot { background: var(--down); box-shadow: inset 0 0 0 2px #8f1d22; }
+.signal-head.miss .signal-ring { border-color: var(--down); animation: sigRing 900ms var(--ease-out-quint) 2; }
+@keyframes sigRing { from { opacity: 0.8; scale: 0.6; } to { opacity: 0; scale: 3; } }
+.signal-label { position: absolute; right: 0; top: calc(50% - 36px); font: 12px var(--mono); white-space: nowrap; }
+.signal-label span { position: absolute; right: 0; opacity: 0; translate: 0 4px; transition: opacity 250ms var(--ease-out-quint), translate 250ms var(--ease-out-quint); }
+.sl-miss { color: var(--down); }
+.signal.ok .sl-ok, .signal.missed .sl-miss { opacity: 1; translate: 0 0; }
+.motion .signal { opacity: 0; animation: fadeUp 1000ms var(--ease-out-quint) 700ms forwards; }
+
+/* ---------- product frame: tilts back to flat as you scroll ---------- */
+.frame-stage { perspective: 1800px; margin-top: 8px; }
+.frame-stage .frame { margin-top: 0; transform-origin: 50% 0; }
+.motion .frame-stage .frame { will-change: transform; }
+.motion .frame-stage { opacity: 0; translate: 0 40px; animation: fadeUp 1100ms var(--ease-out-quint) 650ms forwards; }
+
+/* ---------- generic scroll reveal ---------- */
+.motion [data-reveal] {
+  opacity: 0; translate: 0 26px; filter: blur(6px);
+  transition: opacity 900ms var(--ease-out-quint), translate 900ms var(--ease-out-quint), filter 900ms var(--ease-out-quint);
+  transition-delay: calc(var(--d, 0) * 90ms);
+}
+.motion [data-reveal].in { opacity: 1; translate: 0 0; filter: blur(0); }
+
+/* ---------- feature scenes (play once when scrolled into view) ---------- */
+/* crontab: lines type in, then the result comments appear */
+.motion .code-card pre .ln { display: inline; opacity: 0; }
+.motion .code-card.play pre .ln { animation: lineIn 380ms var(--ease-out-quint) forwards; animation-delay: calc(200ms + var(--i) * 260ms); }
+@keyframes lineIn { from { opacity: 0; } to { opacity: 1; } }
+.motion .code-card .chip.up { opacity: 0; scale: 0.9; }
+.motion .code-card.play .chip.up { animation: chipIn 400ms var(--ease-out-quint) 1500ms forwards; }
+@keyframes chipIn { to { opacity: 1; scale: 1; } }
+
+/* probe log streams in, the failure flashes */
+.motion .probe-card .probe { opacity: 0; translate: -10px 0; }
+.motion .probe-card.play .probe { animation: logIn 450ms var(--ease-out-quint) forwards; animation-delay: calc(var(--i) * 420ms); }
+@keyframes logIn { to { opacity: 1; translate: 0 0; } }
+.motion .probe-card.play .probe:nth-child(4) { animation: logIn 450ms var(--ease-out-quint) forwards, flashRow 1200ms ease 1700ms; animation-delay: 1260ms, 1260ms; }
+@keyframes flashRow { 0%, 100% { background: transparent; } 30% { background: var(--down-wash); } }
+
+/* chat alerts slide in like messages */
+.motion .alert-card .alert-msg { opacity: 0; translate: 0 12px; }
+.motion .alert-card.play .alert-msg { animation: fadeUp 500ms var(--ease-out-quint) forwards; }
+.motion .alert-card.play .alert-msg:nth-child(2) { animation-delay: 1400ms; }
+
+/* status bars grow up from the baseline */
+.motion .status-card .bars i { scale: 1 0; transform-origin: 50% 100%; }
+.motion .status-card.play .bars i { animation: barUp 600ms var(--ease-out-quint) forwards; animation-delay: calc(var(--i) * 12ms); }
+@keyframes barUp { to { scale: 1 1; } }
+
+/* ticker counts get a gentle settle */
+.ticker b.counting { color: var(--accent); }
+
+/* final CTA */
+.final { position: relative; overflow: hidden; }
+.final-ekg { position: absolute; left: 0; right: 0; bottom: 18px; height: 60px; opacity: 0.16; pointer-events: none; }
+.final-ekg path { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.motion .final-ekg path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.motion .final.play .final-ekg path { animation: draw 2600ms var(--ease-in-out-cubic) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.final-row { position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .nav, .btn .arr, .works-grid > div, .step, .plan, .mock-toast, .mrow, .signal-dot, .faq-list summary::after { transition: none; }
+}

@@ -107,14 +107,39 @@ if (!reduced) {
   })();
 }
 
-// ---- live stats ----
+// ---- live stats (count up the first time the band is on screen) ----
+const fmt = (n) => Math.round(n).toLocaleString("en-US");
+let tickerSeen = false;
+let latest = null;
+function countUp(el, to) {
+  if (!document.documentElement.classList.contains("motion")) { el.textContent = fmt(to); return; }
+  const from = Number(el.dataset.shown || 0);
+  const start = performance.now();
+  const ms = from ? 600 : 1400;
+  el.classList.add("counting");
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / ms);
+    const e = 1 - Math.pow(2, -10 * t); // ease-out-expo
+    el.textContent = fmt(from + (to - from) * (t === 1 ? 1 : e));
+    if (t < 1) requestAnimationFrame(step);
+    else el.classList.remove("counting");
+  };
+  requestAnimationFrame(step);
+  el.dataset.shown = String(to);
+}
+function paintStats() {
+  if (!latest || !tickerSeen) return;
+  document.querySelectorAll("[data-stat]").forEach((el) => {
+    const v = latest[el.dataset.stat];
+    if (typeof v === "number" && String(v) !== el.dataset.shown) countUp(el, v);
+  });
+}
+new IntersectionObserver(([e]) => { if (e.isIntersecting) { tickerSeen = true; paintStats(); } }, { threshold: 0.5 })
+  .observe(document.querySelector(".ticker"));
 async function stats() {
   try {
-    const d = await (await fetch("/api/stats")).json();
-    document.querySelectorAll("[data-stat]").forEach((el) => {
-      const v = d[el.dataset.stat];
-      if (typeof v === "number") el.textContent = v.toLocaleString("en-US");
-    });
+    latest = await (await fetch("/api/stats")).json();
+    paintStats();
   } catch {}
 }
 stats();

@@ -254,3 +254,35 @@ details.adv summary { cursor: pointer; font-size: 13px; color: var(--ash); margi
 .empty-big p { color: var(--ash); margin: 8px auto 22px; max-width: 420px; }
 .skeleton { height: 64px; border-radius: var(--r-card); background: linear-gradient(90deg, var(--wash), #f7f5f2, var(--wash)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; margin-bottom: 10px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ---------- motion (product: short, purposeful, ease-out) ---------- */
+/* uptime bars grow in when a page opens, never on background refresh */
+.view.enter .upt .bars i { animation: barGrow 500ms cubic-bezier(0.23, 1, 0.32, 1) both; transform-origin: 50% 100%; }
+.view.enter .upt .bars i:nth-child(3n) { animation-delay: 40ms; }
+.view.enter .upt .bars i:nth-child(3n + 1) { animation-delay: 80ms; }
+@keyframes barGrow { from { scale: 1 0.2; opacity: 0; } to { scale: 1 1; opacity: 1; } }
+
+/* a row whose status just changed flashes once */
+.trow.flash-down { animation: flashDown 1600ms ease-out; }
+.trow.flash-up { animation: flashUp 1600ms ease-out; }
+@keyframes flashDown { 0%, 25% { background: var(--down-wash); } 100% { background: transparent; } }
+@keyframes flashUp { 0%, 25% { background: rgba(228, 242, 34, 0.35); } 100% { background: transparent; } }
+
+/* first ping: the waiting card turns dark with a single ring */
+.waiting { transition: background-color 300ms ease-out, color 300ms ease-out; }
+.waiting.burst .pulse { animation: dotIn 400ms cubic-bezier(0.23, 1, 0.32, 1); }
+.waiting.burst .pulse::after { display: block; background: none; border: 2px solid var(--accent); animation: burst 900ms cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+@keyframes dotIn { from { scale: 0.25; } to { scale: 1; } }
+@keyframes burst { from { scale: 1; opacity: 1; } to { scale: 3.4; opacity: 0; } }
+
+/* chips change colour smoothly when status updates */
+.chip, .dot { transition: background-color 250ms ease, color 250ms ease; }
+
+/* drawer tab content eases in; modal content and menus already animate */
+.dr-body.fresh > * { animation: tabIn 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+@keyframes tabIn { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .view.enter .upt .bars i, .trow.flash-down, .trow.flash-up, .waiting.burst .pulse, .waiting.burst .pulse::after, .dr-body.fresh > * { animation: none; }
+  .waiting, .chip, .dot, .menu, .drawer, .drawer-scrim, .btn { transition: none; }
+}

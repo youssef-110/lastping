@@ -17,6 +17,8 @@
   <script>
     // Old dashboard links (/#/p/slug?key=…) now live under /app.
     if (location.hash.startsWith("#/p/")) location.replace("/app" + location.hash);
+    // Motion styles only apply when JS runs and the visitor allows motion; otherwise everything is visible.
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("motion");
   </script>
 </head>
 <body>
@@ -56,12 +58,18 @@
           <p class="hero-sub">Backups, cron jobs and workers fail silently. Lastping expects a ping on schedule and alerts you the minute one goes missing, so you never find out from a customer.</p>
           <form class="composite" id="heroForm">
             <input class="input" id="heroName" placeholder="Name your first project" maxlength="60" aria-label="Project name" required>
-            <button class="btn btn-primary btn-lg" type="submit">Start monitoring</button>
+            <button class="btn btn-primary btn-lg" type="submit">Start monitoring <span class="arr" aria-hidden="true">→</span></button>
           </form>
           <p class="hero-note" id="heroNote">Free · no credit card · set up in under a minute</p>
         </div>
 
-        <div class="frame" aria-label="Lastping dashboard preview">
+        <div class="signal" aria-hidden="true">
+          <svg class="signal-svg" preserveAspectRatio="none"><g class="signal-track"><path class="signal-path"/></g></svg>
+          <div class="signal-head"><span class="signal-ring"></span><span class="signal-dot"></span></div>
+          <div class="signal-label"><span class="sl-ok">ping received</span><span class="sl-miss">missed ping · alert sent</span></div>
+        </div>
+
+        <div class="frame-stage"><div class="frame" aria-label="Lastping dashboard preview">
           <div class="frame-bar">
             <span></span><span></span><span></span>
             <div class="frame-url">lastping.app/acme-production</div>
@@ -84,7 +92,7 @@
               <div><b id="mtTitle">billing-worker is DOWN</b><span id="mtBody">No ping for 15 min · sent to #ops on Discord</span></div>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
     </section>
 
@@ -275,7 +283,7 @@
     <section class="final">
       <div class="container final-row">
         <h2>Your next silent failure is already scheduled.</h2>
-        <a class="btn btn-primary btn-lg" href="/app#/new">Start monitoring, free</a>
+        <a class="btn btn-primary btn-lg" href="/app#/new">Start monitoring, free <span class="arr" aria-hidden="true">→</span></a>
       </div>
     </section>
   </main>
@@ -299,5 +307,6 @@
   </footer>
 
   <script src="/js/landing.js" type="module"></script>
+  <script src="/js/motion.js" type="module"></script>
 </body>
 </html>
